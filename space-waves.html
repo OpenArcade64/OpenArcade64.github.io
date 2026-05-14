@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Waves — OpenArcade64</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  #wave-canvas { display: block; margin: 0 auto; background: #020408; }
+  .center-canvas { display: flex; justify-content: center; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="../index.html">OpenArcade<span class="logo-64">64</span></a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="game-page">
+    <div class="game-page-header">
+      <h1>〰️ Space Waves</h1>
+      <p>Navigate through deep space. Hold to go up, release to go down.</p>
+    </div>
+
+    <div class="game-container">
+      <div class="game-hud">
+        <div class="hud-stat"><span class="label">Distance</span><span class="value" id="distance">0</span></div>
+        <div class="hud-spacer"></div>
+        <button class="btn btn-primary" id="start-btn" onclick="startGame()">Start</button>
+      </div>
+
+      <div class="center-canvas">
+        <canvas id="wave-canvas" width="640" height="360"></canvas>
+      </div>
+
+      <div class="game-status" id="sw-status"></div>
+
+      <div class="controls-hint">
+        <span class="key-hint">Hold Space / ↑ — Go up</span>
+        <span class="key-hint">Release — Go down</span>
+        <span class="key-hint">Hold screen — Go up</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <a href="../index.html" style="color:inherit;text-decoration:none">← All games</a>
+  <span>OpenArcade64</span>
+</footer>
+
+<script>
+const canvas = document.getElementById('wave-canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ── Ship shape ──────────────────────────────────────────────────
+const SHIP_W = 28, SHIP_H = 16;
+
+function drawShip(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.shadowColor = '#60a5fa';
+  ctx.shadowBlur = 18;
+
+  ctx.beginPath();
+  ctx.moveTo(SHIP_W / 2, 0);
+  ctx.lineTo(-SHIP_W / 2, -SHIP_H / 2);
+  ctx.lineTo(-SHIP_W / 4, 0);
+  ctx.lineTo(-SHIP_W / 2, SHIP_H / 2);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(-SHIP_W/2, 0, SHIP_W/2, 0);
+  grad.addColorStop(0, '#1d4ed8');
+  grad.addColorStop(1, '#93c5fd');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Engine glow
+  ctx.shadowColor = '#f59e0b';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.ellipse(-SHIP_W / 4 - 2, 0, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// ── Stars ───────────────────────────────────────────────────────
+const STAR_COUNT = 120;
+const stars = Array.from({length: STAR_COUNT}, () => ({
+  x: Math.random() * W,
+  y: Math.random() * H,
+  r: Math.random() * 1.5 + 0.3,
+  speed: Math.random() * 1.5 + 0.3,
+  opacity: Math.random() * 0.6 + 0.2,
+}));
+
+function updateStars() {
+  stars.forEach(s => {
+    s.x -= s.speed * (SCROLL / 4);
+    if (s.x < 0) { s.x = W; s.y = Math.random() * H; }
+  });
+}
+
+function drawStars() {
+  stars.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200, 220, 255, ${s.opacity})`;
+    ctx.fill();
+  });
+}
+
+// ── Trail ───────────────────────────────────────────────────────
+// Each point: {x, y, age} — age counts up from 0
+const TRAIL_MAX = 48;   // number of points kept
+const TRAIL_SPACING = 3; // px of ship travel between points
+let trail = [];
+let trailAccum = 0;     // accumulated travel since last point
+let pulseT = 0;         // global time for pulse animation
+
+function recordTrail(x, y) {
+  trailAccum += SCROLL;
+  if (trailAccum >= TRAIL_SPACING) {
+    trailAccum = 0;
+    trail.push({x, y});
+    if (trail.length > TRAIL_MAX) trail.shift();
+  }
+  // Scroll existing trail points left with the world
+  for (let i = 0; i < trail.length - 1; i++) {
+    trail[i].x -= SCROLL;
+  }
+}
+
+function drawTrail() {
+  if (trail.length < 2) return;
+
+  pulseT += 0.07;
+  // Pulse: oscillates between 0.55 and 1.0
+  const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(pulseT));
+
+  for (let i = 1; i < trail.length; i++) {
+    const t = i / trail.length;           // 0 = oldest, 1 = newest
+    const alpha = t * pulse;              // fade toward tail, pulse overall
+    const width = 1 + t * 5;             // thin at tail, thick near ship
+
+    ctx.beginPath();
+    ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+    ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(96, 165, 250, ${alpha})`;
+
+    // Inner bright core on the newest 30%
+    if (t > 0.7) {
+      ctx.shadowColor = '#93c5fd';
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+}
+
+// ── Game state ──────────────────────────────────────────────────
+const SPEED    = 4;   // px per frame — straight up or down
+const SCROLL   = 3;   // world scroll speed
+let ship, pressing, af, running, distance;
+
+function initShip() {
+  ship = { x: 120, y: H / 2 };
+  trail = [];
+  trailAccum = 0;
+}
+
+function startGame() {
+  cancelAnimationFrame(af);
+  initShip();
+  pressing = false;
+  distance = 0;
+  running = true;
+  document.getElementById('sw-status').className = 'game-status';
+  document.getElementById('start-btn').textContent = 'Restart';
+  loop();
+}
+
+function loop() {
+  if (!running) return;
+  update();
+  draw();
+  af = requestAnimationFrame(loop);
+}
+
+function update() {
+  // Pure directional movement — no physics
+  if (pressing) {
+    ship.y -= SPEED;
+  } else {
+    ship.y += SPEED;
+  }
+
+  // Clamp
+  ship.y = Math.max(SHIP_H, Math.min(H - SHIP_H, ship.y));
+
+  // Trail
+  recordTrail(ship.x, ship.y);
+
+  // Distance
+  distance += SCROLL;
+  document.getElementById('distance').textContent = Math.floor(distance / 10);
+
+  updateStars();
+}
+
+function draw() {
+  ctx.fillStyle = '#020408';
+  ctx.fillRect(0, 0, W, H);
+
+  // Nebula
+  const nebula = ctx.createRadialGradient(W * 0.6, H * 0.4, 0, W * 0.6, H * 0.4, W * 0.55);
+  nebula.addColorStop(0, 'rgba(30, 58, 138, 0.12)');
+  nebula.addColorStop(1, 'transparent');
+  ctx.fillStyle = nebula;
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars();
+  drawTrail();
+  drawShip(ship.x, ship.y);
+}
+
+// ── Controls ────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); pressing = true; }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === ' ' || e.key === 'ArrowUp') pressing = false;
+});
+canvas.addEventListener('mousedown',  () => pressing = true);
+canvas.addEventListener('mouseup',    () => pressing = false);
+canvas.addEventListener('mouseleave', () => pressing = false);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); pressing = true;  }, {passive: false});
+canvas.addEventListener('touchend',   e => { e.preventDefault(); pressing = false; }, {passive: false});
+
+// ── Idle draw ───────────────────────────────────────────────────
+(function idleDraw() {
+  ctx.fillStyle = '#020408';
+  ctx.fillRect(0, 0, W, H);
+  drawStars();
+  drawShip(120, H / 2);
+  ctx.fillStyle = 'rgba(200,220,255,0.3)';
+  ctx.font = '500 0.9rem Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Press Start to fly', W / 2, H / 2);
+  ctx.textAlign = 'left';
+})();
+</script>
+</body>
+</html>
