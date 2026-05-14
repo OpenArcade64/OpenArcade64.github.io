@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenArcade64 — Free Browser Games</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .hero-wrap {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 100%);
+    opacity: 0.5;
+  }
+
+  .hero-wrap::after {
+    content: '';
+    position: absolute;
+    top: -80px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 300px;
+    background: radial-gradient(ellipse, rgba(59,130,246,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero {
+    position: relative;
+    z-index: 1;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 5rem 1.5rem 4rem;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--blue-glow);
+    border: 1px solid var(--blue-border);
+    border-radius: 999px;
+    padding: 0.3rem 0.9rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--blue-bright);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 1.75rem;
+  }
+
+  .hero-badge .dot {
+    width: 6px; height: 6px;
+    background: var(--blue);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 6vw, 3.8rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    margin-bottom: 1.25rem;
+  }
+
+  .hero h1 .blue { color: var(--blue-bright); }
+
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--text-2);
+    max-width: 460px;
+    line-height: 1.7;
+    margin-bottom: 2.5rem;
+    font-weight: 400;
+  }
+
+  .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+  .hero-stats {
+    display: flex;
+    gap: 2.5rem;
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .hero-stat .n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--blue-bright);
+    display: block;
+  }
+
+  .hero-stat .l {
+    font-size: 0.78rem;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Section */
+  .section {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-head h2 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+
+  .section-line { flex: 1; height: 1px; background: var(--border); }
+
+  /* Game Grid */
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    min-height: 120px;
+  }
+
+  .game-card {
+    background: var(--surface);
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .game-card:hover { background: var(--surface2); }
+  .game-card:hover .card-arrow { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  .card-accent-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .game-card:hover .card-accent-line { opacity: 1; }
+
+  .card-icon { font-size: 1.75rem; margin-bottom: 0.5rem; display: block; }
+  .card-name { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+  .card-desc { font-size: 0.83rem; color: var(--text-2); line-height: 1.55; flex: 1; }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .card-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+
+  .card-arrow {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+    color: var(--text-2);
+  }
+
+  /* Empty state */
+  .games-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-3);
+    font-size: 0.9rem;
+    grid-column: 1 / -1;
+  }
+
+  /* Debug link */
+  .debug-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-3);
+    font-size: 0.78rem;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.7rem;
+    transition: color 0.15s, border-color 0.15s;
+    margin-top: 2rem;
+  }
+
+  .debug-link:hover { color: var(--text-2); border-color: var(--border-bright); }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="index.html">OpenArcade<span class="logo-64">64</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="debug/index.html">Debug</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="hero-wrap">
+    <div class="hero">
+      <div class="hero-badge"><span class="dot"></span> Free · Open · No Account</div>
+      <h1>Classic arcade games,<br><span class="blue">open to everyone.</span></h1>
+      <p>OpenArcade64 is a free collection of browser games. No downloads, no ads, no logins — just play.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#games" id="first-game-btn">▶ Start Playing</a>
+        <a class="btn btn-ghost" href="#games">Browse Games</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="n" id="game-count">—</span><span class="l">Games</span></div>
+        <div class="hero-stat"><span class="n">0ms</span><span class="l">Load time</span></div>
+        <div class="hero-stat"><span class="n">∞</span><span class="l">Free plays</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="games">
+    <div class="section-head">
+      <h2>All games</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="games-grid" id="games-grid">
+      <div class="games-empty">Loading games…</div>
+    </div>
+    <a class="debug-link" href="debug/index.html">🔧 Debug area</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span>OpenArcade64</span>
+  <span>Free forever · Built with HTML, CSS &amp; JS</span>
+</footer>
+
+<script>
+fetch('games.json')
+  .then(r => r.json())
+  .then(games => {
+    const grid = document.getElementById('games-grid');
+    document.getElementById('game-count').textContent = games.length;
+
+    if (games.length === 0) {
+      grid.innerHTML = '<div class="games-empty">No games yet — check back soon.</div>';
+      return;
+    }
+
+    // Point "Start Playing" to the first game
+    document.getElementById('first-game-btn').href = games[0].file;
+
+    grid.innerHTML = games.map(g => `
+      <a class="game-card" href="${g.file}">
+        <div class="card-accent-line" style="background:${g.color}"></div>
+        <span class="card-icon">${g.icon}</span>
+        <div class="card-name">${g.title}</div>
+        <div class="card-desc">${g.desc}</div>
+        <div class="card-footer">
+          <span class="card-tag">${g.tag}</span>
+          <span class="card-arrow" style="--hover-bg:${g.color}">→</span>
+        </div>
+      </a>
+    `).join('');
+  })
+  .catch(() => {
+    document.getElementById('games-grid').innerHTML =
+      '<div class="games-empty">Could not load games list.</div>';
+  });
+</script>
+</body>
+</html>
