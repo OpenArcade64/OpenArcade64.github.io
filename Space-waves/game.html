@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Waves — OpenArcade64</title>
+<link rel="stylesheet" href="../../style.css">
+<!-- Level CSS injected dynamically via JS -->
+<style>
+  #wave-canvas { display:block; margin:0 auto; background:#020408; }
+  .center-canvas { display:flex; justify-content:center; }
+
+  /* Death overlay */
+  #death-overlay {
+    position:absolute; inset:0; display:none;
+    align-items:center; justify-content:center;
+    flex-direction:column; gap:.75rem;
+    background:rgba(2,4,8,0.72);
+    border-radius:var(--radius-sm);
+    pointer-events:none;
+  }
+  #death-overlay.show { display:flex; }
+  #death-dist {
+    font-family:'JetBrains Mono',monospace;
+    font-size:1.4rem; font-weight:700; color:#ef4444;
+  }
+  #death-sub {
+    font-size:.82rem; color:var(--text-2);
+    animation: fadecount 1.5s linear;
+  }
+  #death-new-best {
+    font-size:.78rem; font-weight:700;
+    color:#f59e0b; letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+  @keyframes fadecount {
+    0%   { opacity:1; }
+    70%  { opacity:1; }
+    100% { opacity:0; }
+  }
+
+  .canvas-wrap { position:relative; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="../../index.html">OpenArcade<span class="logo-64">64</span></a>
+  <ul class="nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="index.html">Space Waves</a></li>
+    <li><a href="#" id="level-nav-link" class="active">—</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="game-page">
+    <div class="game-page-header">
+      <h1>〰️ <span id="level-title">Space Waves</span></h1>
+      <p>Hold Space / ↑ / tap to go up. Release to drop.</p>
+    </div>
+
+    <div class="game-container">
+      <div class="game-hud">
+        <div class="hud-stat"><span class="label">Distance</span><span class="value" id="hud-dist">0</span></div>
+        <div class="hud-stat"><span class="label">Best</span><span class="value" id="hud-best">—</span></div>
+        <div class="hud-spacer"></div>
+        <a class="btn btn-ghost" href="index.html">Levels</a>
+        <button class="btn btn-primary" id="start-btn" onclick="manualStart()">Start</button>
+      </div>
+
+      <div class="canvas-wrap center-canvas">
+        <canvas id="wave-canvas" width="640" height="360"></canvas>
+        <div id="death-overlay">
+          <div id="death-dist"></div>
+          <div id="death-new-best" style="display:none">★ New Best!</div>
+          <div id="death-sub">Restarting…</div>
+        </div>
+      </div>
+
+      <div class="controls-hint">
+        <span class="key-hint">Hold Space / ↑ — Go up</span>
+        <span class="key-hint">Release — Go down</span>
+        <span class="key-hint">Tap canvas — Go up</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <a href="index.html" style="color:inherit;text-decoration:none">← Level Select</a>
+  <span>OpenArcade64</span>
+</footer>
+
+<!-- Dynamically loaded level stylesheet -->
+<link id="level-stylesheet" rel="stylesheet" href="">
+
+<script>
+// ── Parse URL params ─────────────────────────────────────────
+const params    = new URLSearchParams(location.search);
+const levelFile = params.get('level') || 'levels/level-1.css';
+const levelId   = params.get('id')    || 'level-1';
+
+// Load level CSS
+document.getElementById('level-stylesheet').href = levelFile;
+
+// High score storage
+function getHS() { return parseInt(localStorage.getItem('sw-hs-' + levelId) || '0'); }
+function saveHS(v) { localStorage.setItem('sw-hs-' + levelId, v); }
+
+// ── Canvas ───────────────────────────────────────────────────
+const canvas = document.getElementById('wave-canvas');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ── CSS var helpers ──────────────────────────────────────────
+// Must call after level stylesheet has loaded
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || (fallback !== undefined ? String(fallback) : '');
+}
+function cssNum(name, fallback) { return parseFloat(cssVar(name, fallback)) || fallback; }
+
+function loadLevel() {
+  const count = Math.max(1, cssNum('--level-segment-count', 1));
+  const segs  = [];
+  for (let i = 1; i <= count; i++) {
+    segs.push({
+      width:  cssNum(`--seg-${i}-width`,  200),
+      top:    cssNum(`--seg-${i}-top`,    0.15),
+      bottom: cssNum(`--seg-${i}-bottom`, 0.85),
+      color:  cssVar(`--seg-${i}-color`,  cssVar('--wall-default-color','#1e3a5f')),
+    });
+  }
+  return segs;
+}
+
+let SCROLL, SPEED, BG_COLOR;
+function loadGlobals() {
+  SCROLL   = cssNum('--level-scroll-speed', 3);
+  SPEED    = cssNum('--ship-speed',         4);
+  BG_COLOR = cssVar('--bg-color',           '#020408');
+  canvas.style.background = BG_COLOR;
+}
+
+// ── Stars ────────────────────────────────────────────────────
+const stars = Array.from({length:120}, () => ({
+  x:Math.random()*W, y:Math.random()*H,
+  r:Math.random()*1.5+0.3, speed:Math.random()*1.5+0.3,
+  opacity:Math.random()*0.6+0.2,
+}));
+function updateStars() {
+  stars.forEach(s => { s.x -= s.speed*(SCROLL/4); if(s.x<0){s.x=W;s.y=Math.random()*H;} });
+}
+function drawStars() {
+  stars.forEach(s => {
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(200,220,255,${s.opacity})`; ctx.fill();
+  });
+}
+
+// ── Ship ─────────────────────────────────────────────────────
+const SHIP_W=28, SHIP_H=16;
+function drawShip(x,y,angle) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+  ctx.shadowColor='#60a5fa'; ctx.shadowBlur=18;
+  ctx.beginPath();
+  ctx.moveTo(SHIP_W/2,0); ctx.lineTo(-SHIP_W/2,-SHIP_H/2);
+  ctx.lineTo(-SHIP_W/4,0); ctx.lineTo(-SHIP_W/2,SHIP_H/2);
+  ctx.closePath();
+  const g=ctx.createLinearGradient(-SHIP_W/2,0,SHIP_W/2,0);
+  g.addColorStop(0,'#1d4ed8'); g.addColorStop(1,'#93c5fd');
+  ctx.fillStyle=g; ctx.fill();
+  ctx.shadowColor='#f59e0b'; ctx.shadowBlur=12; ctx.fillStyle='#fbbf24';
+  ctx.beginPath(); ctx.ellipse(-SHIP_W/4-2,0,5,3,0,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0; ctx.restore();
+}
+
+// ── Trail ────────────────────────────────────────────────────
+const TRAIL_MAX=48, TRAIL_SPACING=3;
+let trail=[], trailAccum=0, pulseT=0;
+function recordTrail(x,y) {
+  trailAccum+=SCROLL;
+  if(trailAccum>=TRAIL_SPACING){trailAccum=0;trail.push({x,y});if(trail.length>TRAIL_MAX)trail.shift();}
+  for(let i=0;i<trail.length-1;i++) trail[i].x-=SCROLL;
+}
+function drawTrail() {
+  if(trail.length<2) return;
+  pulseT+=0.07;
+  const pulse=0.55+0.45*(0.5+0.5*Math.sin(pulseT));
+  for(let i=1;i<trail.length;i++){
+    const t=i/trail.length;
+    ctx.beginPath(); ctx.moveTo(trail[i-1].x,trail[i-1].y); ctx.lineTo(trail[i].x,trail[i].y);
+    ctx.lineWidth=1+t*5; ctx.lineCap='round';
+    ctx.strokeStyle=`rgba(96,165,250,${t*pulse})`;
+    ctx.shadowColor=t>0.7?'#93c5fd':'transparent'; ctx.shadowBlur=t>0.7?8:0;
+    ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+}
+
+// ── Segment queue ─────────────────────────────────────────────
+let levelSegs=[], worldX=0, segQueue=[];
+const PRELOAD_PX=W+400;
+
+function initSegQueue(){segQueue=[];worldX=0;buildSegQueue();}
+function buildSegQueue(){
+  let re=segQueue.length>0?segQueue[segQueue.length-1].startX+segQueue[segQueue.length-1].width:0;
+  let cur=segQueue.length===0?0:(segQueue[segQueue.length-1].segIdx+1)%levelSegs.length;
+  while(re<worldX+PRELOAD_PX){
+    const s=levelSegs[cur%levelSegs.length];
+    segQueue.push({segIdx:cur%levelSegs.length,startX:re,width:s.width,top:s.top,bottom:s.bottom,color:s.color});
+    re+=s.width; cur++;
+  }
+}
+function updateSegQueue(){
+  worldX+=SCROLL;
+  while(segQueue.length>0&&segQueue[0].startX+segQueue[0].width<worldX) segQueue.shift();
+  buildSegQueue();
+}
+function drawSegments(){
+  segQueue.forEach(seg=>{
+    const sx=seg.startX-worldX;
+    const topH=seg.top*H, botH=(1-seg.bottom)*H;
+    ctx.fillStyle=seg.color;
+    ctx.fillRect(sx,0,seg.width,topH);
+    ctx.fillRect(sx,H-botH,seg.width,botH);
+    [[topH],[H-botH]].forEach(([ey])=>{
+      const eg=ctx.createLinearGradient(0,ey-6,0,ey+6);
+      eg.addColorStop(0,'rgba(96,165,250,0)');
+      eg.addColorStop(0.5,'rgba(96,165,250,0.18)');
+      eg.addColorStop(1,'rgba(96,165,250,0)');
+      ctx.fillStyle=eg; ctx.fillRect(sx,ey-6,seg.width,12);
+    });
+  });
+}
+function checkCollision(sx,sy){
+  const seg=segQueue.find(s=>{const x=s.startX-worldX;return sx+SHIP_W/2>x&&sx-SHIP_W/2<x+s.width;});
+  if(!seg) return false;
+  if(sy-SHIP_H/2<seg.top*H) return true;
+  if(sy+SHIP_H/2>seg.bottom*H) return true;
+  return false;
+}
+
+// ── Game state ────────────────────────────────────────────────
+let ship, pressing=false, af, running=false, distance=0;
+let shipAngle=0, targetAngle=0;
+let highScore=0, restartTimer=null;
+
+function initShip(){ship={x:100,y:H/2};trail=[];trailAccum=0;shipAngle=0;targetAngle=0;}
+
+function startGame(){
+  if(restartTimer){clearTimeout(restartTimer);restartTimer=null;}
+  cancelAnimationFrame(af);
+  loadGlobals(); levelSegs=loadLevel();
+  initShip(); initSegQueue();
+  pressing=false; distance=0; running=true;
+  highScore=getHS();
+  document.getElementById('death-overlay').classList.remove('show');
+  document.getElementById('hud-best').textContent = highScore>0?highScore:'—';
+  document.getElementById('start-btn').textContent='Restart';
+  loop();
+}
+
+// Manual start from button — stop any pending auto-restart
+function manualStart(){ startGame(); }
+
+function loop(){if(!running)return;update();draw();af=requestAnimationFrame(loop);}
+
+function update(){
+  if(pressing){ship.y-=SPEED;targetAngle=-0.45;}
+  else{ship.y+=SPEED;targetAngle=0.45;}
+  shipAngle+=(targetAngle-shipAngle)*0.15;
+  ship.y=Math.max(SHIP_H,Math.min(H-SHIP_H,ship.y));
+  recordTrail(ship.x,ship.y);
+  updateSegQueue();
+  distance+=SCROLL;
+  const dist=Math.floor(distance/10);
+  document.getElementById('hud-dist').textContent=dist;
+  updateStars();
+
+  if(checkCollision(ship.x,ship.y)){
+    running=false; cancelAnimationFrame(af);
+    handleDeath(dist);
+  }
+}
+
+function handleDeath(dist){
+  draw(); // final frame
+
+  let isNewBest=false;
+  if(dist>highScore){
+    highScore=dist; saveHS(highScore);
+    document.getElementById('hud-best').textContent=highScore;
+    isNewBest=true;
+  }
+
+  // Show overlay
+  const overlay=document.getElementById('death-overlay');
+  document.getElementById('death-dist').textContent='💥 '+dist+' km';
+  document.getElementById('death-new-best').style.display=isNewBest?'block':'none';
+  document.getElementById('death-sub').textContent='Restarting in 1.5s…';
+  overlay.classList.add('show');
+
+  // Auto-restart after 1.5 s
+  restartTimer=setTimeout(()=>{
+    overlay.classList.remove('show');
+    startGame();
+  }, 1500);
+}
+
+function draw(){
+  ctx.fillStyle=BG_COLOR; ctx.fillRect(0,0,W,H);
+  const nb=ctx.createRadialGradient(W*.6,H*.4,0,W*.6,H*.4,W*.55);
+  nb.addColorStop(0,'rgba(30,58,138,0.12)'); nb.addColorStop(1,'transparent');
+  ctx.fillStyle=nb; ctx.fillRect(0,0,W,H);
+  drawStars(); drawSegments(); drawTrail(); drawShip(ship.x,ship.y,shipAngle);
+}
+
+// ── Controls ──────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.key===' '||e.key==='ArrowUp'){e.preventDefault();pressing=true;}
+});
+document.addEventListener('keyup',e=>{
+  if(e.key===' '||e.key==='ArrowUp') pressing=false;
+});
+canvas.addEventListener('mousedown', ()=>pressing=true);
+canvas.addEventListener('mouseup',   ()=>pressing=false);
+canvas.addEventListener('mouseleave',()=>pressing=false);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();pressing=true;},{passive:false});
+canvas.addEventListener('touchend',  e=>{e.preventDefault();pressing=false;},{passive:false});
+
+// ── Level metadata from levels.json ──────────────────────────
+fetch('levels/levels.json')
+  .then(r=>r.json())
+  .then(levels=>{
+    const lv=levels.find(l=>l.id===levelId)||levels[0];
+    if(lv){
+      document.getElementById('level-title').textContent=lv.name;
+      document.getElementById('level-nav-link').textContent=lv.name;
+      document.title=lv.name+' — Space Waves';
+    }
+  }).catch(()=>{});
+
+// ── Boot: wait for level CSS then idle draw ───────────────────
+const levelSheet=document.getElementById('level-stylesheet');
+function boot(){
+  loadGlobals(); levelSegs=loadLevel();
+  highScore=getHS();
+  document.getElementById('hud-best').textContent=highScore>0?highScore:'—';
+  // Idle draw
+  ctx.fillStyle=BG_COLOR; ctx.fillRect(0,0,W,H);
+  drawStars(); drawShip(100,H/2,0);
+  ctx.fillStyle='rgba(200,220,255,0.3)';
+  ctx.font='500 0.9rem Syne,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Press Start to fly',W/2,H/2); ctx.textAlign='left';
+}
+// If stylesheet already loaded (cached), load; otherwise wait
+if(levelSheet.sheet){boot();}
+else{levelSheet.addEventListener('load',boot);levelSheet.addEventListener('error',boot);}
+</script>
+</body>
+</html>
