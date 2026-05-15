@@ -2,9 +2,9 @@
   {
     "id": "space-waves",
     "title": "Space Waves",
-    "file": "games/space-waves.html",
+    "file": "games/Space-waves/index.html",
     "icon": "〰️",
-    "desc": "Ride the wave through deep space. Navigate up and down to survive.",
+    "desc": "Idea from Geometry Dash",
     "tag": "Arcade",
     "color": "#3b82f6"
   }
