@@ -2,7 +2,7 @@
   {
     "id": "space-waves",
     "title": "Space Waves",
-    "file": "games/Space-waves/index.html",
+    "file": "games/Space-waves/editor.html",
     "icon": "〰️",
     "desc": "Idea from Geometry Dash",
     "tag": "Arcade",
