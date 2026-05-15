@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Waves — OpenArcade64</title>
+<link rel="stylesheet" href="../style.css">
+<!-- Level definition — swap this file to change the level -->
+<link rel="stylesheet" href="space-waves-level.css" id="level-css">
+<style>
+  #wave-canvas { display: block; margin: 0 auto; background: #020408; }
+  .center-canvas { display: flex; justify-content: center; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="../index.html">OpenArcade<span class="logo-64">64</span></a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="game-page">
+    <div class="game-page-header">
+      <h1>〰️ Space Waves</h1>
+      <p>Navigate through deep space. Hold to go up, release to go down.</p>
+    </div>
+
+    <div class="game-container">
+      <div class="game-hud">
+        <div class="hud-stat"><span class="label">Distance</span><span class="value" id="distance">0</span></div>
+        <div class="hud-spacer"></div>
+        <button class="btn btn-primary" id="start-btn" onclick="startGame()">Start</button>
+      </div>
+
+      <div class="center-canvas">
+        <canvas id="wave-canvas" width="640" height="360"></canvas>
+      </div>
+
+      <div class="game-status" id="sw-status"></div>
+
+      <div class="controls-hint">
+        <span class="key-hint">Hold Space / ↑ — Go up</span>
+        <span class="key-hint">Release — Go down</span>
+        <span class="key-hint">Hold screen — Go up</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <a href="../index.html" style="color:inherit;text-decoration:none">← All games</a>
+  <span>OpenArcade64</span>
+</footer>
+
+<script>
+const canvas = document.getElementById('wave-canvas');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || (fallback !== undefined ? String(fallback) : '');
+}
+function cssNum(name, fallback) { return parseFloat(cssVar(name, fallback)) || fallback; }
+
+function loadLevel() {
+  const count = Math.max(1, cssNum('--level-segment-count', 1));
+  const segs  = [];
+  for (let i = 1; i <= count; i++) {
+    segs.push({
+      width:  cssNum(`--seg-${i}-width`,  200),
+      top:    cssNum(`--seg-${i}-top`,    0.15),
+      bottom: cssNum(`--seg-${i}-bottom`, 0.85),
+      color:  cssVar(`--seg-${i}-color`,  cssVar('--wall-default-color','#1e3a5f')),
+    });
+  }
+  return segs;
+}
+
+let SCROLL, SPEED, BG_COLOR;
+function loadGlobals() {
+  SCROLL   = cssNum('--level-scroll-speed', 3);
+  SPEED    = cssNum('--ship-speed',         4);
+  BG_COLOR = cssVar('--bg-color',           '#020408');
+  canvas.style.background = BG_COLOR;
+}
+
+// Stars
+const stars = Array.from({length: 120}, () => ({
+  x: Math.random()*W, y: Math.random()*H,
+  r: Math.random()*1.5+0.3, speed: Math.random()*1.5+0.3,
+  opacity: Math.random()*0.6+0.2,
+}));
+function updateStars() {
+  stars.forEach(s => { s.x -= s.speed*(SCROLL/4); if(s.x<0){s.x=W;s.y=Math.random()*H;} });
+}
+function drawStars() {
+  stars.forEach(s => {
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(200,220,255,${s.opacity})`; ctx.fill();
+  });
+}
+
+// Ship
+const SHIP_W=28, SHIP_H=16;
+function drawShip(x, y, angle) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+  ctx.shadowColor='#60a5fa'; ctx.shadowBlur=18;
+  ctx.beginPath();
+  ctx.moveTo(SHIP_W/2,0); ctx.lineTo(-SHIP_W/2,-SHIP_H/2);
+  ctx.lineTo(-SHIP_W/4,0); ctx.lineTo(-SHIP_W/2,SHIP_H/2);
+  ctx.closePath();
+  const g=ctx.createLinearGradient(-SHIP_W/2,0,SHIP_W/2,0);
+  g.addColorStop(0,'#1d4ed8'); g.addColorStop(1,'#93c5fd');
+  ctx.fillStyle=g; ctx.fill();
+  ctx.shadowColor='#f59e0b'; ctx.shadowBlur=12; ctx.fillStyle='#fbbf24';
+  ctx.beginPath(); ctx.ellipse(-SHIP_W/4-2,0,5,3,0,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0; ctx.restore();
+}
+
+// Trail
+const TRAIL_MAX=48, TRAIL_SPACING=3;
+let trail=[], trailAccum=0, pulseT=0;
+function recordTrail(x,y) {
+  trailAccum+=SCROLL;
+  if(trailAccum>=TRAIL_SPACING){trailAccum=0;trail.push({x,y});if(trail.length>TRAIL_MAX)trail.shift();}
+  for(let i=0;i<trail.length-1;i++) trail[i].x-=SCROLL;
+}
+function drawTrail() {
+  if(trail.length<2) return;
+  pulseT+=0.07;
+  const pulse=0.55+0.45*(0.5+0.5*Math.sin(pulseT));
+  for(let i=1;i<trail.length;i++){
+    const t=i/trail.length;
+    ctx.beginPath(); ctx.moveTo(trail[i-1].x,trail[i-1].y); ctx.lineTo(trail[i].x,trail[i].y);
+    ctx.lineWidth=1+t*5; ctx.lineCap='round';
+    ctx.strokeStyle=`rgba(96,165,250,${t*pulse})`;
+    ctx.shadowColor=t>0.7?'#93c5fd':'transparent'; ctx.shadowBlur=t>0.7?8:0;
+    ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+}
+
+// Level segments
+let levelSegs=[], worldX=0, segQueue=[];
+const PRELOAD_PX=W+400;
+
+function initSegQueue(){segQueue=[];worldX=0;buildSegQueue();}
+
+function buildSegQueue(){
+  let rightEdge=segQueue.length>0?segQueue[segQueue.length-1].startX+segQueue[segQueue.length-1].width:0;
+  let cursor=segQueue.length===0?0:(segQueue[segQueue.length-1].segIdx+1)%levelSegs.length;
+  while(rightEdge<worldX+PRELOAD_PX){
+    const s=levelSegs[cursor%levelSegs.length];
+    segQueue.push({segIdx:cursor%levelSegs.length,startX:rightEdge,width:s.width,top:s.top,bottom:s.bottom,color:s.color});
+    rightEdge+=s.width; cursor++;
+  }
+}
+
+function updateSegQueue(){
+  worldX+=SCROLL;
+  while(segQueue.length>0&&segQueue[0].startX+segQueue[0].width<worldX) segQueue.shift();
+  buildSegQueue();
+}
+
+function drawSegments(){
+  segQueue.forEach(seg=>{
+    const sx=seg.startX-worldX;
+    const topH=seg.top*H, botH=(1-seg.bottom)*H;
+    ctx.fillStyle=seg.color;
+    ctx.fillRect(sx,0,seg.width,topH);
+    ctx.fillRect(sx,H-botH,seg.width,botH);
+    // Edge glow
+    [[topH,1],[H-botH,-1]].forEach(([edgeY])=>{
+      const eg=ctx.createLinearGradient(0,edgeY-6,0,edgeY+6);
+      eg.addColorStop(0,'rgba(96,165,250,0)');
+      eg.addColorStop(0.5,'rgba(96,165,250,0.18)');
+      eg.addColorStop(1,'rgba(96,165,250,0)');
+      ctx.fillStyle=eg; ctx.fillRect(sx,edgeY-6,seg.width,12);
+    });
+  });
+}
+
+function checkCollision(sx,sy){
+  const seg=segQueue.find(s=>{const x=s.startX-worldX;return sx+SHIP_W/2>x&&sx-SHIP_W/2<x+s.width;});
+  if(!seg) return false;
+  if(sy-SHIP_H/2<seg.top*H) return true;
+  if(sy+SHIP_H/2>seg.bottom*H) return true;
+  return false;
+}
+
+// Game state
+let ship, pressing, af, running, distance, shipAngle=0, targetAngle=0;
+
+function initShip(){ship={x:100,y:H/2};trail=[];trailAccum=0;shipAngle=0;targetAngle=0;}
+
+function startGame(){
+  cancelAnimationFrame(af);
+  loadGlobals(); levelSegs=loadLevel();
+  initShip(); initSegQueue();
+  pressing=false; distance=0; running=true;
+  document.getElementById('sw-status').className='game-status';
+  document.getElementById('start-btn').textContent='Restart';
+  loop();
+}
+
+function loop(){if(!running)return;update();draw();af=requestAnimationFrame(loop);}
+
+function update(){
+  if(pressing){ship.y-=SPEED;targetAngle=-0.45;}
+  else{ship.y+=SPEED;targetAngle=0.45;}
+  shipAngle+=(targetAngle-shipAngle)*0.15;
+  ship.y=Math.max(SHIP_H,Math.min(H-SHIP_H,ship.y));
+  recordTrail(ship.x,ship.y);
+  updateSegQueue();
+  distance+=SCROLL;
+  document.getElementById('distance').textContent=Math.floor(distance/10);
+  updateStars();
+  if(checkCollision(ship.x,ship.y)){
+    running=false; cancelAnimationFrame(af); draw();
+    const el=document.getElementById('sw-status');
+    el.className='game-status lose';
+    el.textContent='💥 Crashed — Distance: '+Math.floor(distance/10);
+    document.getElementById('start-btn').textContent='Try Again';
+  }
+}
+
+function draw(){
+  ctx.fillStyle=BG_COLOR; ctx.fillRect(0,0,W,H);
+  const nb=ctx.createRadialGradient(W*.6,H*.4,0,W*.6,H*.4,W*.55);
+  nb.addColorStop(0,'rgba(30,58,138,0.12)'); nb.addColorStop(1,'transparent');
+  ctx.fillStyle=nb; ctx.fillRect(0,0,W,H);
+  drawStars(); drawSegments(); drawTrail(); drawShip(ship.x,ship.y,shipAngle);
+}
+
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowUp'){e.preventDefault();pressing=true;}});
+document.addEventListener('keyup',  e=>{if(e.key===' '||e.key==='ArrowUp')pressing=false;});
+canvas.addEventListener('mousedown', ()=>pressing=true);
+canvas.addEventListener('mouseup',   ()=>pressing=false);
+canvas.addEventListener('mouseleave',()=>pressing=false);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();pressing=true;},{passive:false});
+canvas.addEventListener('touchend',  e=>{e.preventDefault();pressing=false;},{passive:false});
+
+loadGlobals(); levelSegs=loadLevel();
+(function idleDraw(){
+  ctx.fillStyle=BG_COLOR; ctx.fillRect(0,0,W,H);
+  drawStars(); drawShip(100,H/2,0);
+  ctx.fillStyle='rgba(200,220,255,0.3)';
+  ctx.font='500 0.9rem Syne,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Press Start to fly',W/2,H/2); ctx.textAlign='left';
+})();
+</script>
+</body>
+</html>
