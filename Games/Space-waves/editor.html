@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Waves — Level Editor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#080b12;--panel:#0e1420;--panel2:#141c2e;
+  --border:#1e2d4a;--border2:#2a3d5e;
+  --blue:#3b7ef6;--blue-b:#5a9fff;--blue-glow:rgba(59,126,246,0.18);
+  --cyan:#22d3ee;--amber:#f59e0b;--red:#ef4444;--green:#22c55e;
+  --text:#dde5f4;--text2:#6e84a8;--text3:#374560;
+  --mono:'Space Mono',monospace;--sans:'Space Grotesk',sans-serif;
+  --r:8px;--r-sm:5px;
+}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  -webkit-font-smoothing:antialiased;}
+
+/* ── Topbar ── */
+.topbar{background:var(--panel);border-bottom:1px solid var(--border);
+  padding:0 1.25rem;height:52px;display:flex;align-items:center;gap:.75rem;
+  flex-shrink:0;z-index:10;}
+.topbar-logo{font-family:var(--mono);font-size:.8rem;font-weight:700;
+  color:var(--blue-b);letter-spacing:.04em;display:flex;align-items:center;gap:.5rem;white-space:nowrap;}
+.topbar-logo .tag{background:var(--blue);color:#fff;font-size:.6rem;
+  padding:.1rem .4rem;border-radius:3px;letter-spacing:.06em;}
+.topbar-sep{width:1px;height:24px;background:var(--border);flex-shrink:0;}
+.topbar-spacer{flex:1;}
+
+/* Mode tabs */
+.mode-tabs{display:flex;gap:2px;background:var(--panel2);
+  border:1px solid var(--border);border-radius:var(--r-sm);padding:2px;}
+.mode-tab{padding:.3rem .85rem;border-radius:4px;font-size:.78rem;
+  font-weight:600;cursor:pointer;border:none;background:transparent;
+  color:var(--text2);font-family:var(--sans);transition:all .13s;}
+.mode-tab.active{background:var(--blue);color:#fff;}
+.mode-tab:hover:not(.active){background:var(--border);color:var(--text);}
+
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.38rem .9rem;
+  border-radius:var(--r-sm);font-family:var(--sans);font-size:.82rem;
+  font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .13s;white-space:nowrap;}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-primary:hover{background:#2563eb;}
+.btn-ghost{background:transparent;color:var(--text2);border-color:var(--border2);}
+.btn-ghost:hover{background:var(--panel2);color:var(--text);}
+.btn-danger{background:transparent;color:var(--red);border-color:rgba(239,68,68,.3);}
+.btn-danger:hover{background:rgba(239,68,68,.1);}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green);}
+.btn-green:hover{background:#16a34a;}
+.btn-sm{padding:.25rem .6rem;font-size:.75rem;}
+.btn-icon{padding:.38rem .55rem;}
+
+/* ── Workspace ── */
+.workspace{display:flex;flex:1;overflow:hidden;}
+
+/* ── Left panel ── */
+.seg-panel{width:240px;flex-shrink:0;background:var(--panel);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.panel-header{padding:.65rem .85rem;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.panel-title{font-size:.68rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--text2);}
+.seg-list{flex:1;overflow-y:auto;padding:.4rem;display:flex;
+  flex-direction:column;gap:2px;}
+.seg-list::-webkit-scrollbar{width:4px;}
+.seg-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+.seg-item{background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:.45rem .65rem;cursor:pointer;
+  display:flex;align-items:center;gap:.5rem;transition:border-color .12s,background .12s;user-select:none;}
+.seg-item:hover{border-color:var(--border2);background:#18223a;}
+.seg-item.active{border-color:var(--blue);background:var(--blue-glow);}
+.seg-num{font-family:var(--mono);font-size:.62rem;color:var(--text3);width:16px;flex-shrink:0;}
+.seg-preview{flex:1;height:24px;border-radius:3px;overflow:hidden;
+  position:relative;background:#0a0f1a;}
+.seg-preview-wall{position:absolute;left:0;right:0;background:var(--border2);}
+.seg-width-badge{font-family:var(--mono);font-size:.58rem;color:var(--text3);flex-shrink:0;}
+
+/* ── Centre ── */
+.preview-area{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.preview-toolbar{padding:.55rem .9rem;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:.65rem;flex-shrink:0;background:var(--panel);}
+.preview-label{font-size:.68rem;font-weight:600;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--text2);}
+.preview-canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;
+  overflow:auto;padding:1.25rem;position:relative;}
+canvas{border-radius:var(--r);border:1px solid var(--border);display:block;}
+
+/* Play mode overlay on canvas */
+.play-overlay{position:absolute;inset:0;display:none;
+  align-items:center;justify-content:center;pointer-events:none;}
+.play-overlay.show{display:flex;}
+.play-overlay-inner{background:rgba(2,4,8,.75);border-radius:var(--r);
+  padding:.6rem 1.2rem;font-size:.8rem;color:var(--text2);text-align:center;}
+
+/* ── Right panel ── */
+.edit-panel{width:270px;flex-shrink:0;background:var(--panel);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.edit-scroll{flex:1;overflow-y:auto;padding:.9rem;display:flex;flex-direction:column;gap:1.1rem;}
+.edit-scroll::-webkit-scrollbar{width:4px;}
+.edit-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+.field-group{display:flex;flex-direction:column;gap:.4rem;}
+.field-label{font-size:.65rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--text2);}
+.field-row{display:flex;gap:.5rem;align-items:center;}
+.field-input{flex:1;background:var(--panel2);border:1px solid var(--border2);
+  border-radius:var(--r-sm);padding:.38rem .6rem;color:var(--text);
+  font-family:var(--mono);font-size:.8rem;outline:none;transition:border-color .13s;width:100%;}
+.field-input:focus{border-color:var(--blue);}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;
+  background:var(--border2);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--blue);border:2px solid var(--bg);cursor:pointer;}
+.range-row{display:flex;align-items:center;gap:.55rem;}
+.range-val{font-family:var(--mono);font-size:.73rem;color:var(--blue-b);width:38px;
+  text-align:right;flex-shrink:0;}
+input[type=color]{width:34px;height:26px;border:1px solid var(--border2);
+  border-radius:var(--r-sm);background:var(--panel2);cursor:pointer;padding:2px;}
+.edit-divider{height:1px;background:var(--border);margin:0 -.9rem;}
+.global-field{display:flex;flex-direction:column;gap:.3rem;}
+
+/* Play HUD */
+.play-hud{display:flex;gap:.5rem;align-items:center;flex:1;}
+.play-stat{font-family:var(--mono);font-size:.78rem;color:var(--text2);}
+.play-stat span{color:var(--blue-b);}
+
+/* Death overlay on play canvas */
+#play-death{position:absolute;inset:0;display:none;align-items:center;
+  justify-content:center;flex-direction:column;gap:.5rem;
+  background:rgba(2,4,8,.7);border-radius:var(--r);pointer-events:none;}
+#play-death.show{display:flex;}
+#play-death-dist{font-family:var(--mono);font-size:1.2rem;font-weight:700;color:var(--red);}
+#play-death-sub{font-size:.75rem;color:var(--text2);}
+
+.hint-text{font-size:.7rem;color:var(--text3);text-align:center;padding:.3rem 0;}
+
+/* Toast */
+.toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%) translateY(8px);
+  background:var(--green);color:#fff;font-size:.8rem;font-weight:600;
+  padding:.45rem 1.1rem;border-radius:999px;opacity:0;transition:opacity .2s,transform .2s;
+  pointer-events:none;z-index:999;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">〰️ SPACE WAVES <span class="tag">EDITOR</span></div>
+  <div class="topbar-sep"></div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tab-edit" onclick="setMode('edit')">✏️ Edit</button>
+    <button class="mode-tab"        id="tab-play" onclick="setMode('play')">▶ Play Test</button>
+  </div>
+
+  <div class="topbar-sep"></div>
+  <button class="btn btn-ghost btn-sm" onclick="addSegment()">＋ Segment</button>
+  <button class="btn btn-ghost btn-sm" onclick="importCSS()">↑ Import</button>
+  <div class="topbar-spacer"></div>
+  <button class="btn btn-ghost btn-sm" onclick="copyCSS()">Copy CSS</button>
+  <button class="btn btn-primary btn-sm" onclick="downloadCSS()">↓ Download CSS</button>
+</div>
+
+<div class="workspace">
+
+  <!-- Left: segment list (hidden in play mode) -->
+  <div class="seg-panel" id="seg-panel">
+    <div class="panel-header">
+      <span class="panel-title">Segments <span id="seg-count" style="color:var(--blue-b)">0</span></span>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="addSegment()">＋</button>
+    </div>
+    <div class="seg-list" id="seg-list"></div>
+  </div>
+
+  <!-- Centre: canvas -->
+  <div class="preview-area">
+    <div class="preview-toolbar" id="preview-toolbar">
+      <span class="preview-label" id="toolbar-label">Level Preview</span>
+      <div style="flex:1"></div>
+      <!-- Edit mode toolbar -->
+      <div id="edit-toolbar-btns">
+        <span style="font-size:.7rem;color:var(--text3);font-family:var(--mono)" id="canvas-size"></span>
+      </div>
+      <!-- Play mode toolbar (hidden initially) -->
+      <div id="play-toolbar-btns" style="display:none;align-items:center;gap:.75rem;flex:1">
+        <div class="play-hud">
+          <span class="play-stat">Dist <span id="play-dist">0</span></span>
+          <span class="play-stat">Best <span id="play-best">—</span></span>
+        </div>
+        <button class="btn btn-green btn-sm" id="play-start-btn" onclick="playStart()">▶ Start</button>
+        <button class="btn btn-ghost btn-sm" onclick="setMode('edit')">✕ Exit</button>
+      </div>
+    </div>
+
+    <div class="preview-canvas-wrap" id="canvas-wrap">
+      <!-- Edit canvas -->
+      <canvas id="preview-canvas" width="640" height="360"></canvas>
+      <!-- Play canvas (hidden initially) -->
+      <canvas id="play-canvas"    width="640" height="360" style="display:none"></canvas>
+      <div id="play-death">
+        <div id="play-death-dist"></div>
+        <div id="play-death-sub">Restarting in 1.5s…</div>
+      </div>
+    </div>
+    <p class="hint-text" id="canvas-hint">Click a segment in the preview to select · Drag to reorder</p>
+  </div>
+
+  <!-- Right: editor (hidden in play mode) -->
+  <div class="edit-panel" id="edit-panel">
+    <div class="panel-header">
+      <span class="panel-title" id="edit-title">Select a segment</span>
+    </div>
+    <div class="edit-scroll" id="edit-scroll">
+      <div id="no-selection" style="color:var(--text3);font-size:.82rem;padding:.3rem 0">
+        Click a segment to edit it.
+      </div>
+
+      <div class="edit-divider"></div>
+
+      <div class="field-group">
+        <div class="field-label">Global Settings</div>
+        <div class="global-field">
+          <span style="font-size:.7rem;color:var(--text2)">Scroll Speed</span>
+          <div class="range-row">
+            <input type="range" id="g-scroll" min="1" max="10" step=".5" value="3" oninput="updateGlobal()">
+            <span class="range-val" id="g-scroll-val">3</span>
+          </div>
+        </div>
+        <div class="global-field">
+          <span style="font-size:.7rem;color:var(--text2)">Ship Speed</span>
+          <div class="range-row">
+            <input type="range" id="g-ship" min="1" max="12" step=".5" value="4" oninput="updateGlobal()">
+            <span class="range-val" id="g-ship-val">4</span>
+          </div>
+        </div>
+        <div class="global-field">
+          <span style="font-size:.7rem;color:var(--text2)">Background</span>
+          <div class="field-row">
+            <input type="color" id="g-bg" value="#020408" oninput="syncColorToText('g-bg','g-bg-hex');updateGlobal()">
+            <input type="text" class="field-input" id="g-bg-hex" value="#020408"
+              oninput="syncColorFromText('g-bg','g-bg-hex');updateGlobal()">
+          </div>
+        </div>
+        <div class="global-field">
+          <span style="font-size:.7rem;color:var(--text2)">Default Wall Color</span>
+          <div class="field-row">
+            <input type="color" id="g-wall" value="#1e3a5f" oninput="syncColorToText('g-wall','g-wall-hex');updateGlobal()">
+            <input type="text" class="field-input" id="g-wall-hex" value="#1e3a5f"
+              oninput="syncColorFromText('g-wall','g-wall-hex');updateGlobal()">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="file-input" accept=".css" style="display:none" onchange="handleImport(event)">
+
+<script>
+// ════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════
+let segments = [];
+let selected  = null;
+let globals   = { scrollSpeed:3, shipSpeed:4, bg:'#020408', wallColor:'#1e3a5f' };
+let currentMode = 'edit'; // 'edit' | 'play'
+
+const DEFAULT = [
+  {width:300,top:.15,bottom:.85,color:'#1e3a5f'},
+  {width:180,top:.22,bottom:.85,color:'#1e3a5f'},
+  {width:180,top:.22,bottom:.72,color:'#1e3a5f'},
+  {width:200,top:.10,bottom:.40,color:'#1e4080'},
+  {width:200,top:.60,bottom:.90,color:'#1e4080'},
+  {width:160,top:.38,bottom:.62,color:'#1a3a70'},
+  {width:250,top:.18,bottom:.82,color:'#1e3a5f'},
+  {width:150,top:.08,bottom:.35,color:'#243b80'},
+  {width:150,top:.65,bottom:.92,color:'#243b80'},
+  {width:180,top:.40,bottom:.60,color:'#2a3f8f'},
+  {width:300,top:.20,bottom:.80,color:'#1e3a5f'},
+  {width:200,top:.30,bottom:.70,color:'#1e4080'},
+];
+segments = DEFAULT.map(s=>({...s}));
+selected  = 0;
+
+// ════════════════════════════════════════════════════
+//  EDIT CANVAS
+// ════════════════════════════════════════════════════
+const editCanvas = document.getElementById('preview-canvas');
+const ectx       = editCanvas.getContext('2d');
+const CW = editCanvas.width, CH = editCanvas.height;
+document.getElementById('canvas-size').textContent = `${CW}×${CH}`;
+
+function drawEditPreview(){
+  ectx.fillStyle=globals.bg; ectx.fillRect(0,0,CW,CH);
+  // Static stars
+  const rng=mulberry32(42);
+  ectx.fillStyle='rgba(180,210,255,0.22)';
+  for(let i=0;i<80;i++){const sx=rng()*CW,sy=rng()*CH,sr=rng()*1.2+.3;
+    ectx.beginPath();ectx.arc(sx,sy,sr,0,Math.PI*2);ectx.fill();}
+  const total=segments.reduce((s,seg)=>s+seg.width,0);
+  const scale=total>CW?CW/total:1;
+  let x=0;
+  segments.forEach((seg,i)=>{
+    const sw=seg.width*scale;
+    const topH=seg.top*CH, botH=(1-seg.bottom)*CH;
+    const col=selected===i?lighten(seg.color,30):seg.color;
+    ectx.fillStyle=col;
+    ectx.fillRect(x,0,sw,topH);
+    ectx.fillRect(x,CH-botH,sw,botH);
+    if(selected===i){
+      ectx.strokeStyle='#60a5fa';ectx.lineWidth=2;
+      ectx.strokeRect(x+1,0,sw-2,topH);
+      ectx.strokeRect(x+1,CH-botH,sw-2,botH);
+    }
+    // Number label
+    if(topH>10){
+      ectx.fillStyle='rgba(255,255,255,0.2)';
+      ectx.font=`9px 'Space Mono',monospace`;ectx.textAlign='center';
+      ectx.fillText(i+1,x+sw/2,topH/2+4);ectx.textAlign='left';
+    }
+    x+=sw;
+  });
+  // Ship marker
+  ectx.save();ectx.translate(80,CH/2);
+  ectx.shadowColor='#60a5fa';ectx.shadowBlur=14;
+  ectx.beginPath();ectx.moveTo(14,0);ectx.lineTo(-14,-8);ectx.lineTo(-7,0);ectx.lineTo(-14,8);ectx.closePath();
+  const g=ectx.createLinearGradient(-14,0,14,0);g.addColorStop(0,'#1d4ed8');g.addColorStop(1,'#93c5fd');
+  ectx.fillStyle=g;ectx.fill();ectx.shadowBlur=0;ectx.restore();
+}
+
+editCanvas.addEventListener('click',e=>{
+  if(currentMode!=='edit') return;
+  const rect=editCanvas.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(CW/rect.width);
+  const total=segments.reduce((s,seg)=>s+seg.width,0);
+  const scale=total>CW?CW/total:1;
+  let x=0;
+  for(let i=0;i<segments.length;i++){
+    const sw=segments[i].width*scale;
+    if(mx>=x&&mx<x+sw){selectSegment(i);return;}
+    x+=sw;
+  }
+});
+
+// ════════════════════════════════════════════════════
+//  SEGMENT LIST
+// ════════════════════════════════════════════════════
+function renderList(){
+  document.getElementById('seg-count').textContent=segments.length;
+  const list=document.getElementById('seg-list');
+  list.innerHTML='';
+  segments.forEach((seg,i)=>{
+    const item=document.createElement('div');
+    item.className='seg-item'+(selected===i?' active':'');
+    item.draggable=true; item.dataset.i=i;
+    const topPct=(seg.top*100).toFixed(0)+'%';
+    const botPct=((1-seg.bottom)*100).toFixed(0)+'%';
+    item.innerHTML=`
+      <span class="seg-num">${i+1}</span>
+      <div class="seg-preview">
+        <div class="seg-preview-wall" style="top:0;height:${topPct};background:${seg.color}"></div>
+        <div class="seg-preview-wall" style="bottom:0;height:${botPct};background:${seg.color}"></div>
+      </div>
+      <span class="seg-width-badge">${seg.width}</span>
+      <button class="btn btn-danger btn-sm btn-icon" title="Delete"
+        onclick="deleteSegment(${i});event.stopPropagation()">✕</button>
+    `;
+    item.addEventListener('click',()=>selectSegment(i));
+    item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',i);item.classList.add('dragging');});
+    item.addEventListener('dragend',()=>item.classList.remove('dragging'));
+    item.addEventListener('dragover',e=>{e.preventDefault();item.classList.add('drag-over');});
+    item.addEventListener('dragleave',()=>item.classList.remove('drag-over'));
+    item.addEventListener('drop',e=>{
+      e.preventDefault();item.classList.remove('drag-over');
+      const from=parseInt(e.dataTransfer.getData('text/plain')),to=i;
+      if(from===to)return;
+      const moved=segments.splice(from,1)[0];segments.splice(to,0,moved);
+      if(selected===from)selected=to;
+      else if(selected>from&&selected<=to)selected--;
+      else if(selected<from&&selected>=to)selected++;
+      renderAll();
+    });
+    list.appendChild(item);
+  });
+}
+
+function selectSegment(i){selected=i;renderList();renderEditor();drawEditPreview();}
+
+// ════════════════════════════════════════════════════
+//  EDITOR PANEL
+// ════════════════════════════════════════════════════
+function renderEditor(){
+  const title=document.getElementById('edit-title');
+  const noSel=document.getElementById('no-selection');
+  if(selected===null||!segments[selected]){
+    title.textContent='Select a segment';noSel.style.display='';
+    const old=document.getElementById('seg-editor');if(old)old.remove();return;
+  }
+  noSel.style.display='none';
+  const seg=segments[selected];
+  title.textContent=`Segment ${selected+1}`;
+  let editor=document.getElementById('seg-editor');
+  if(!editor){
+    editor=document.createElement('div');editor.id='seg-editor';
+    editor.style.cssText='display:flex;flex-direction:column;gap:1.1rem;';
+    document.querySelector('.edit-divider').before(editor);
+  }
+  const gap=(seg.bottom-seg.top).toFixed(2);
+  editor.innerHTML=`
+    <div class="field-group">
+      <div class="field-label">Width (px)</div>
+      <div class="range-row">
+        <input type="range" id="e-width" min="40" max="600" step="10" value="${seg.width}" oninput="updateSeg()">
+        <span class="range-val" id="e-width-val">${seg.width}</span>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Top Wall (${(seg.top*100).toFixed(0)}%)</div>
+      <div class="range-row">
+        <input type="range" id="e-top" min="0" max=".88" step=".01" value="${seg.top}" oninput="updateSeg()">
+        <span class="range-val" id="e-top-val">${(seg.top*100).toFixed(0)}%</span>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Bottom Wall (${(seg.bottom*100).toFixed(0)}%)</div>
+      <div class="range-row">
+        <input type="range" id="e-bottom" min=".12" max="1" step=".01" value="${seg.bottom}" oninput="updateSeg()">
+        <span class="range-val" id="e-bottom-val">${(seg.bottom*100).toFixed(0)}%</span>
+      </div>
+    </div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-sm);padding:.5rem .7rem">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:.7rem;color:var(--text2)">Gap</span>
+        <span id="e-gap-val" style="font-family:var(--mono);font-size:.75rem;color:${gap<.15?'var(--red)':'var(--green)'}">${(gap*100).toFixed(0)}%</span>
+      </div>
+      <div style="margin-top:.35rem;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div id="e-gap-bar" style="height:100%;width:${gap*100}%;background:${gap<.15?'var(--red)':'var(--green)'};border-radius:2px;transition:width .1s"></div>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Wall Color</div>
+      <div class="field-row">
+        <input type="color" id="e-color" value="${seg.color}"
+          oninput="syncColorToText('e-color','e-color-hex');updateSeg()">
+        <input type="text" class="field-input" id="e-color-hex" value="${seg.color}"
+          oninput="syncColorFromText('e-color','e-color-hex');updateSeg()">
+      </div>
+    </div>
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="duplicateSegment(${selected})">⧉ Dupe</button>
+      <button class="btn btn-danger btn-sm" style="flex:1" onclick="deleteSegment(${selected})">✕ Delete</button>
+    </div>
+  `;
+}
+
+function updateSeg(){
+  if(selected===null)return;
+  const seg=segments[selected];
+  seg.width  = parseFloat(document.getElementById('e-width').value);
+  seg.top    = parseFloat(document.getElementById('e-top').value);
+  seg.bottom = Math.max(parseFloat(document.getElementById('e-bottom').value),seg.top+.08);
+  seg.color  = document.getElementById('e-color').value;
+  document.getElementById('e-color-hex').value=seg.color;
+  document.getElementById('e-width-val').textContent=seg.width;
+  document.getElementById('e-top-val').textContent=(seg.top*100).toFixed(0)+'%';
+  document.getElementById('e-bottom-val').textContent=(seg.bottom*100).toFixed(0)+'%';
+  const gap=seg.bottom-seg.top;
+  document.getElementById('e-gap-val').textContent=(gap*100).toFixed(0)+'%';
+  document.getElementById('e-gap-val').style.color=gap<.15?'var(--red)':'var(--green)';
+  document.getElementById('e-gap-bar').style.width=(gap*100)+'%';
+  document.getElementById('e-gap-bar').style.background=gap<.15?'var(--red)':'var(--green)';
+  renderList();drawEditPreview();
+}
+
+function updateGlobal(){
+  globals.scrollSpeed=parseFloat(document.getElementById('g-scroll').value);
+  globals.shipSpeed=parseFloat(document.getElementById('g-ship').value);
+  globals.bg=document.getElementById('g-bg').value;
+  globals.wallColor=document.getElementById('g-wall').value;
+  document.getElementById('g-scroll-val').textContent=globals.scrollSpeed;
+  document.getElementById('g-ship-val').textContent=globals.shipSpeed;
+  document.getElementById('g-bg-hex').value=globals.bg;
+  document.getElementById('g-wall-hex').value=globals.wallColor;
+  drawEditPreview();
+}
+
+function syncColorToText(cid,tid){document.getElementById(tid).value=document.getElementById(cid).value;}
+function syncColorFromText(cid,tid){const h=document.getElementById(tid).value.trim();if(/^#[0-9a-fA-F]{6}$/.test(h))document.getElementById(cid).value=h;}
+
+function addSegment(){
+  const tops=[.15,.22,.10,.35,.20,.05,.42,.30];const bots=[.85,.72,.40,.80,.65,.32,.58,.70];
+  const i=segments.length%tops.length;
+  segments.push({width:200,top:tops[i],bottom:bots[i],color:'#1e3a5f'});
+  selected=segments.length-1;renderAll();
+  setTimeout(()=>{const l=document.getElementById('seg-list');l.scrollTop=l.scrollHeight;},50);
+}
+function deleteSegment(i){
+  segments.splice(i,1);
+  if(selected>=segments.length)selected=segments.length-1;
+  if(segments.length===0)selected=null;
+  renderAll();
+}
+function duplicateSegment(i){
+  segments.splice(i+1,0,{...segments[i]});selected=i+1;renderAll();
+}
+
+// ════════════════════════════════════════════════════
+//  PLAY MODE
+// ════════════════════════════════════════════════════
+const playCanvas = document.getElementById('play-canvas');
+const pctx       = playCanvas.getContext('2d');
+const PW=playCanvas.width, PH=playCanvas.height;
+
+let pShip,pPressing=false,pAf,pRunning=false,pDist=0;
+let pAngle=0,pTargetAngle=0,pWorldX=0,pSegQueue=[];
+let pTrail=[],pTrailAccum=0,pPulseT=0;
+let pRestartTimer=null,pBest=0;
+
+// Stars (shared static positions)
+const pStars=Array.from({length:120},()=>({
+  x:Math.random()*PW,y:Math.random()*PH,
+  r:Math.random()*1.5+.3,speed:Math.random()*1.5+.3,
+  opacity:Math.random()*.6+.2,
+}));
+
+function pUpdateStars(){pStars.forEach(s=>{s.x-=s.speed*(globals.scrollSpeed/4);if(s.x<0){s.x=PW;s.y=Math.random()*PH;}});}
+function pDrawStars(){pStars.forEach(s=>{pctx.beginPath();pctx.arc(s.x,s.y,s.r,0,Math.PI*2);pctx.fillStyle=`rgba(200,220,255,${s.opacity})`;pctx.fill();});}
+
+function pDrawShip(x,y,angle){
+  pctx.save();pctx.translate(x,y);pctx.rotate(angle);
+  pctx.shadowColor='#60a5fa';pctx.shadowBlur=18;
+  pctx.beginPath();pctx.moveTo(14,0);pctx.lineTo(-14,-8);pctx.lineTo(-7,0);pctx.lineTo(-14,8);pctx.closePath();
+  const g=pctx.createLinearGradient(-14,0,14,0);g.addColorStop(0,'#1d4ed8');g.addColorStop(1,'#93c5fd');
+  pctx.fillStyle=g;pctx.fill();
+  pctx.shadowColor='#f59e0b';pctx.shadowBlur=12;pctx.fillStyle='#fbbf24';
+  pctx.beginPath();pctx.ellipse(-9,0,5,3,0,0,Math.PI*2);pctx.fill();
+  pctx.shadowBlur=0;pctx.restore();
+}
+
+function pRecordTrail(x,y){
+  pTrailAccum+=globals.scrollSpeed;
+  if(pTrailAccum>=3){pTrailAccum=0;pTrail.push({x,y});if(pTrail.length>48)pTrail.shift();}
+  for(let i=0;i<pTrail.length-1;i++)pTrail[i].x-=globals.scrollSpeed;
+}
+function pDrawTrail(){
+  if(pTrail.length<2)return;
+  pPulseT+=.07;const pulse=.55+.45*(.5+.5*Math.sin(pPulseT));
+  for(let i=1;i<pTrail.length;i++){
+    const t=i/pTrail.length;
+    pctx.beginPath();pctx.moveTo(pTrail[i-1].x,pTrail[i-1].y);pctx.lineTo(pTrail[i].x,pTrail[i].y);
+    pctx.lineWidth=1+t*5;pctx.lineCap='round';
+    pctx.strokeStyle=`rgba(96,165,250,${t*pulse})`;
+    pctx.shadowColor=t>.7?'#93c5fd':'transparent';pctx.shadowBlur=t>.7?8:0;pctx.stroke();
+  }
+  pctx.shadowBlur=0;
+}
+
+function pBuildSegQueue(){
+  let re=pSegQueue.length>0?pSegQueue[pSegQueue.length-1].startX+pSegQueue[pSegQueue.length-1].width:0;
+  let cur=pSegQueue.length===0?0:(pSegQueue[pSegQueue.length-1].segIdx+1)%segments.length;
+  while(re<pWorldX+(PW+400)){
+    const s=segments[cur%segments.length];
+    pSegQueue.push({segIdx:cur%segments.length,startX:re,width:s.width,top:s.top,bottom:s.bottom,color:s.color});
+    re+=s.width;cur++;
+  }
+}
+function pUpdateSegQueue(){
+  pWorldX+=globals.scrollSpeed;
+  while(pSegQueue.length>0&&pSegQueue[0].startX+pSegQueue[0].width<pWorldX)pSegQueue.shift();
+  pBuildSegQueue();
+}
+function pDrawSegs(){
+  pSegQueue.forEach(seg=>{
+    const sx=seg.startX-pWorldX;
+    const topH=seg.top*PH,botH=(1-seg.bottom)*PH;
+    pctx.fillStyle=seg.color;
+    pctx.fillRect(sx,0,seg.width,topH);
+    pctx.fillRect(sx,PH-botH,seg.width,botH);
+    [[topH],[PH-botH]].forEach(([ey])=>{
+      const eg=pctx.createLinearGradient(0,ey-6,0,ey+6);
+      eg.addColorStop(0,'rgba(96,165,250,0)');eg.addColorStop(.5,'rgba(96,165,250,0.18)');eg.addColorStop(1,'rgba(96,165,250,0)');
+      pctx.fillStyle=eg;pctx.fillRect(sx,ey-6,seg.width,12);
+    });
+  });
+}
+function pCheckCollision(){
+  const seg=pSegQueue.find(s=>{const x=s.startX-pWorldX;return pShip.x+14>x&&pShip.x-14<x+s.width;});
+  if(!seg)return false;
+  if(pShip.y-8<seg.top*PH)return true;
+  if(pShip.y+8>seg.bottom*PH)return true;
+  return false;
+}
+
+function playStart(){
+  if(pRestartTimer){clearTimeout(pRestartTimer);pRestartTimer=null;}
+  cancelAnimationFrame(pAf);
+  pShip={x:100,y:PH/2};pTrail=[];pTrailAccum=0;pAngle=0;pTargetAngle=0;
+  pWorldX=0;pSegQueue=[];pDist=0;pRunning=true;pPressing=false;
+  pBuildSegQueue();
+  document.getElementById('play-death').classList.remove('show');
+  document.getElementById('play-dist').textContent='0';
+  document.getElementById('play-start-btn').textContent='↺ Restart';
+  pLoop();
+}
+
+function pLoop(){if(!pRunning)return;pUpdate();pDraw();pAf=requestAnimationFrame(pLoop);}
+
+function pUpdate(){
+  if(pPressing){pShip.y-=globals.shipSpeed;pTargetAngle=-.45;}
+  else{pShip.y+=globals.shipSpeed;pTargetAngle=.45;}
+  pAngle+=(pTargetAngle-pAngle)*.15;
+  pShip.y=Math.max(8,Math.min(PH-8,pShip.y));
+  pRecordTrail(pShip.x,pShip.y);
+  pUpdateSegQueue();
+  pDist+=globals.scrollSpeed;
+  const d=Math.floor(pDist/10);
+  document.getElementById('play-dist').textContent=d;
+  pUpdateStars();
+  if(pCheckCollision()){
+    pRunning=false;cancelAnimationFrame(pAf);pDraw();
+    if(d>pBest){pBest=d;document.getElementById('play-best').textContent=pBest;}
+    const dd=document.getElementById('play-death');
+    document.getElementById('play-death-dist').textContent='💥 '+d+' km';
+    document.getElementById('play-death-sub').textContent='Restarting in 1.5s…';
+    dd.classList.add('show');
+    pRestartTimer=setTimeout(()=>{dd.classList.remove('show');playStart();},1500);
+  }
+}
+
+function pDraw(){
+  pctx.fillStyle=globals.bg;pctx.fillRect(0,0,PW,PH);
+  const nb=pctx.createRadialGradient(PW*.6,PH*.4,0,PW*.6,PH*.4,PW*.55);
+  nb.addColorStop(0,'rgba(30,58,138,0.12)');nb.addColorStop(1,'transparent');
+  pctx.fillStyle=nb;pctx.fillRect(0,0,PW,PH);
+  pDrawStars();pDrawSegs();pDrawTrail();pDrawShip(pShip.x,pShip.y,pAngle);
+}
+
+// ── Mode switching ───────────────────────────────────────────
+function setMode(mode){
+  currentMode=mode;
+  const isPlay=mode==='play';
+  document.getElementById('tab-edit').classList.toggle('active',!isPlay);
+  document.getElementById('tab-play').classList.toggle('active',isPlay);
+  document.getElementById('seg-panel').style.display=isPlay?'none':'flex';
+  document.getElementById('edit-panel').style.display=isPlay?'none':'flex';
+  document.getElementById('edit-toolbar-btns').style.display=isPlay?'none':'flex';
+  document.getElementById('play-toolbar-btns').style.display=isPlay?'flex':'none';
+  editCanvas.style.display=isPlay?'none':'block';
+  playCanvas.style.display=isPlay?'block':'none';
+  document.getElementById('canvas-hint').textContent=isPlay
+    ?'Hold Space / ↑ / tap canvas to go up. Release to go down.'
+    :'Click a segment in the preview to select · Drag to reorder';
+
+  if(isPlay){
+    // Stop any active play run and reset for fresh start
+    cancelAnimationFrame(pAf);
+    if(pRestartTimer){clearTimeout(pRestartTimer);pRestartTimer=null;}
+    pRunning=false;
+    document.getElementById('play-death').classList.remove('show');
+    document.getElementById('play-start-btn').textContent='▶ Start';
+    document.getElementById('play-dist').textContent='0';
+    // Draw idle frame
+    pctx.fillStyle=globals.bg;pctx.fillRect(0,0,PW,PH);
+    pDrawStars();pDrawShip(100,PH/2,0);
+    pctx.fillStyle='rgba(200,220,255,0.3)';
+    pctx.font="500 0.9rem 'Space Grotesk',sans-serif";pctx.textAlign='center';
+    pctx.fillText('Press Start to play test',PW/2,PH/2);pctx.textAlign='left';
+  } else {
+    // Stop play if switching back
+    cancelAnimationFrame(pAf);
+    if(pRestartTimer){clearTimeout(pRestartTimer);pRestartTimer=null;}
+    pRunning=false;
+    renderAll();
+  }
+}
+
+// ── Shared controls (work in both modes) ─────────────────────
+document.addEventListener('keydown',e=>{
+  if(currentMode==='play'&&(e.key===' '||e.key==='ArrowUp')){e.preventDefault();pPressing=true;}
+});
+document.addEventListener('keyup',e=>{
+  if(e.key===' '||e.key==='ArrowUp') pPressing=false;
+});
+playCanvas.addEventListener('mousedown', ()=>pPressing=true);
+playCanvas.addEventListener('mouseup',   ()=>pPressing=false);
+playCanvas.addEventListener('mouseleave',()=>pPressing=false);
+playCanvas.addEventListener('touchstart',e=>{e.preventDefault();pPressing=true;},{passive:false});
+playCanvas.addEventListener('touchend',  e=>{e.preventDefault();pPressing=false;},{passive:false});
+
+// ════════════════════════════════════════════════════
+//  CSS IMPORT / EXPORT
+// ════════════════════════════════════════════════════
+function generateCSS(){
+  return [
+    `/* Space Waves — Level Definition`,
+    ` * Generated by the Space Waves Level Editor`,
+    ` * ${new Date().toLocaleString()} */`,
+    ``,`:root {`,
+    `  --level-scroll-speed: ${globals.scrollSpeed};`,
+    `  --level-gap-min:      0.12;`,
+    `  --wall-default-color: ${globals.wallColor};`,
+    `  --bg-color:           ${globals.bg};`,
+    `  --ship-speed:         ${globals.shipSpeed};`,
+    `  --level-segment-count: ${segments.length};`,
+    ``,
+    ...segments.flatMap((seg,i)=>{
+      const n=i+1;
+      return[`  /* ${n} */`,
+        `  --seg-${n}-width:  ${seg.width};`,
+        `  --seg-${n}-top:    ${seg.top.toFixed(2)};`,
+        `  --seg-${n}-bottom: ${seg.bottom.toFixed(2)};`,
+        `  --seg-${n}-color:  ${seg.color};`];
+    }),
+    `}`
+  ].join('\n');
+}
+
+function downloadCSS(){
+  const blob=new Blob([generateCSS()],{type:'text/css'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='space-waves-level.css';
+  a.click();URL.revokeObjectURL(url);showToast('Downloaded!');
+}
+function copyCSS(){navigator.clipboard.writeText(generateCSS()).then(()=>showToast('Copied to clipboard!'));}
+function importCSS(){document.getElementById('file-input').click();}
+
+function handleImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{try{parseCSS(ev.target.result);showToast('Level imported!');}catch(err){alert('Parse error: '+err.message);}};
+  reader.readAsText(file);e.target.value='';
+}
+
+function parseCSS(css){
+  const gv=name=>{const m=css.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`));return m?m[1].trim():null;};
+  const sc=gv('level-scroll-speed'),sh=gv('ship-speed'),bg=gv('bg-color'),wc=gv('wall-default-color'),ct=gv('level-segment-count');
+  if(sc)globals.scrollSpeed=parseFloat(sc);
+  if(sh)globals.shipSpeed=parseFloat(sh);
+  if(bg)globals.bg=bg;
+  if(wc)globals.wallColor=wc;
+  document.getElementById('g-scroll').value=globals.scrollSpeed;
+  document.getElementById('g-ship').value=globals.shipSpeed;
+  document.getElementById('g-bg').value=globals.bg;
+  document.getElementById('g-wall').value=globals.wallColor;
+  document.getElementById('g-scroll-val').textContent=globals.scrollSpeed;
+  document.getElementById('g-ship-val').textContent=globals.shipSpeed;
+  document.getElementById('g-bg-hex').value=globals.bg;
+  document.getElementById('g-wall-hex').value=globals.wallColor;
+  const n=parseInt(ct)||0;
+  if(n>0){
+    segments=[];
+    for(let i=1;i<=n;i++){
+      const w=gv(`seg-${i}-width`),t=gv(`seg-${i}-top`),b=gv(`seg-${i}-bottom`),c=gv(`seg-${i}-color`);
+      if(w&&t&&b)segments.push({width:parseFloat(w),top:parseFloat(t),bottom:parseFloat(b),color:c||globals.wallColor});
+    }
+    selected=segments.length>0?0:null;
+  }
+  renderAll();
+}
+
+// ════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════
+function renderAll(){renderList();renderEditor();drawEditPreview();}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function mulberry32(seed){
+  return function(){seed|=0;seed=seed+0x6D2B79F5|0;
+    let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;};
+}
+
+function lighten(hex,amt){
+  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return'#'+[Math.min(255,r+amt),Math.min(255,g+amt),Math.min(255,b+amt)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>
