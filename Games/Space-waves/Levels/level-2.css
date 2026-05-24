@@ -1,0 +1,28 @@
+/* Space Waves — Level 2: Asteroid Belt | Difficulty: Medium */
+:root {
+  --level-scroll-speed:  4;
+  --level-gap-min:       0.12;
+  --wall-default-color:  #2a1f5f;
+  --bg-color:            #030208;
+  --ship-speed:          4;
+  --level-segment-count: 18;
+
+  --seg-1-width:  200; --seg-1-top:  0.15; --seg-1-bottom: 0.85; --seg-1-color:  #2a1f5f;
+  --seg-2-width:  160; --seg-2-top:  0.08; --seg-2-bottom: 0.38; --seg-2-color:  #2a1f5f;
+  --seg-3-width:  160; --seg-3-top:  0.62; --seg-3-bottom: 0.92; --seg-3-color:  #2a1f5f;
+  --seg-4-width:  220; --seg-4-top:  0.18; --seg-4-bottom: 0.82; --seg-4-color:  #2a1f5f;
+  --seg-5-width:  150; --seg-5-top:  0.38; --seg-5-bottom: 0.62; --seg-5-color:  #3a2080;
+  --seg-6-width:  170; --seg-6-top:  0.05; --seg-6-bottom: 0.35; --seg-6-color:  #2a1f5f;
+  --seg-7-width:  170; --seg-7-top:  0.65; --seg-7-bottom: 0.95; --seg-7-color:  #2a1f5f;
+  --seg-8-width:  250; --seg-8-top:  0.18; --seg-8-bottom: 0.82; --seg-8-color:  #2a1f5f;
+  --seg-9-width:  160; --seg-9-top:  0.28; --seg-9-bottom: 0.58; --seg-9-color:  #3a2080;
+  --seg-10-width: 160; --seg-10-top: 0.42; --seg-10-bottom: 0.72; --seg-10-color: #3a2080;
+  --seg-11-width: 220; --seg-11-top: 0.15; --seg-11-bottom: 0.85; --seg-11-color: #2a1f5f;
+  --seg-12-width: 140; --seg-12-top: 0.04; --seg-12-bottom: 0.30; --seg-12-color: #2a1f5f;
+  --seg-13-width: 140; --seg-13-top: 0.70; --seg-13-bottom: 0.96; --seg-13-color: #2a1f5f;
+  --seg-14-width: 200; --seg-14-top: 0.15; --seg-14-bottom: 0.85; --seg-14-color: #2a1f5f;
+  --seg-15-width: 150; --seg-15-top: 0.40; --seg-15-bottom: 0.60; --seg-15-color: #3a2080;
+  --seg-16-width: 150; --seg-16-top: 0.10; --seg-16-bottom: 0.38; --seg-16-color: #2a1f5f;
+  --seg-17-width: 150; --seg-17-top: 0.62; --seg-17-bottom: 0.90; --seg-17-color: #2a1f5f;
+  --seg-18-width: 220; --seg-18-top: 0.22; --seg-18-bottom: 0.78; --seg-18-color: #3a2080;
+}

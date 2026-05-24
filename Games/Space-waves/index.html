@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Waves — OpenArcade64</title>
+<link rel="stylesheet" href="../../style.css">
+<style>
+  .sw-hero { text-align:center; padding:3rem 1.5rem 2rem; max-width:700px; margin:0 auto; }
+  .sw-hero h1 { font-size:clamp(2rem,5vw,3rem); font-weight:800; letter-spacing:-.04em; margin-bottom:.5rem; }
+  .sw-hero p  { color:var(--text-2); font-size:.95rem; }
+
+  .levels-section { max-width:700px; margin:0 auto; padding:0 1.5rem 5rem; }
+
+  .section-head { display:flex; align-items:center; gap:.75rem; margin-bottom:1.25rem; }
+  .section-head h2 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text-3); white-space:nowrap; }
+  .section-line { flex:1; height:1px; background:var(--border); }
+
+  .level-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:1px; background:var(--border); border:1px solid var(--border);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  .level-card {
+    background:var(--surface); padding:1.5rem;
+    display:flex; flex-direction:column; gap:.5rem;
+    cursor:pointer; text-decoration:none; color:inherit; position:relative;
+    transition:background .15s;
+  }
+  .level-card:hover { background:var(--surface2); }
+  .level-card:hover .play-arrow { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+  .level-accent { position:absolute; top:0; left:0; right:0; height:2px; opacity:0; transition:opacity .15s; }
+  .level-card:hover .level-accent { opacity:1; }
+
+  .level-number { font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--text-3); text-transform:uppercase; letter-spacing:.08em; }
+  .level-name   { font-size:1.1rem; font-weight:700; letter-spacing:-.02em; }
+  .level-desc   { font-size:.83rem; color:var(--text-2); line-height:1.55; flex:1; }
+
+  .level-footer { display:flex; align-items:center; justify-content:space-between; margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--border); }
+
+  .diff-badge { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; padding:.2rem .55rem; border-radius:999px; border:1px solid; }
+  .diff-Easy   { color:#22c55e; border-color:rgba(34,197,94,.3);  background:rgba(34,197,94,.08);  }
+  .diff-Medium { color:#f59e0b; border-color:rgba(245,158,11,.3); background:rgba(245,158,11,.08); }
+  .diff-Hard   { color:#ef4444; border-color:rgba(239,68,68,.3);  background:rgba(239,68,68,.08);  }
+
+  .level-best { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--text-3); display:flex; align-items:center; gap:.35rem; }
+  .level-best .val { color:var(--blue-bright); }
+
+  .play-arrow {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px; border-radius:50%;
+    background:var(--surface2); border:1px solid var(--border-bright);
+    font-size:.85rem; transition:all .15s; color:var(--text-2);
+  }
+
+  .editor-link {
+    display:inline-flex; align-items:center; gap:.5rem; margin-top:1.5rem;
+    color:var(--text-3); font-size:.8rem; text-decoration:none;
+    border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:.35rem .8rem; transition:color .15s,border-color .15s;
+  }
+  .editor-link:hover { color:var(--text-2); border-color:var(--border-bright); }
+  .loading { color:var(--text-3); font-size:.9rem; padding:2rem; text-align:center; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="../../index.html">OpenArcade<span class="logo-64">64</span></a>
+  <ul class="nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="index.html" class="active">Space Waves</a></li>
+  </ul>
+</nav>
+
+<main>
+  <div class="sw-hero">
+    <h1>〰️ Space Waves</h1>
+    <p>Navigate your ship through deep space tunnels. Hold to rise, release to drop.</p>
+  </div>
+
+  <div class="levels-section">
+    <div class="section-head">
+      <h2>Select Level</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="level-grid" id="level-grid">
+      <div class="loading">Loading levels…</div>
+    </div>
+
+    <a class="editor-link" href="editor.html">🛠 Open Level Editor</a>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <a href="../../index.html" style="color:inherit;text-decoration:none">← All Games</a>
+  <span>OpenArcade64</span>
+</footer>
+
+<script>
+function getHS(id) { return parseInt(localStorage.getItem('sw-hs-' + id) || '0'); }
+
+fetch('levels/levels.json')
+  .then(r => r.json())
+  .then(levels => {
+    const grid = document.getElementById('level-grid');
+    if (!levels.length) { grid.innerHTML = '<div class="loading">No levels found.</div>'; return; }
+    grid.innerHTML = levels.map((lv, i) => {
+      const hs = getHS(lv.id);
+      return `
+        <a class="level-card" href="game.html?level=${encodeURIComponent(lv.file)}&id=${encodeURIComponent(lv.id)}">
+          <div class="level-accent" style="background:${lv.color}"></div>
+          <div class="level-number">Level ${i + 1}</div>
+          <div class="level-name">${lv.name}</div>
+          <div class="level-desc">${lv.desc}</div>
+          <div class="level-footer">
+            <span class="diff-badge diff-${lv.difficulty}">${lv.difficulty}</span>
+            <span class="level-best">Best <span class="val">${hs > 0 ? hs : '—'}</span></span>
+            <span class="play-arrow">▶</span>
+          </div>
+        </a>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('level-grid').innerHTML = '<div class="loading">Could not load levels.</div>';
+  });
+</script>
+</body>
+</html>
