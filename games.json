@@ -2,7 +2,7 @@
   {
     "id": "space-waves",
     "title": "Space Waves",
-    "file": "games/space-waves/index.html",
+    "file": "Games/Space-waves/index.html",
     "icon": "〰️",
     "desc": "Ride the wave through deep space. Hold to rise, release to drop.",
     "tag": "Arcade",
