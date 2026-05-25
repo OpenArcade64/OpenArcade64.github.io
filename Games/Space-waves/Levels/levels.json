@@ -4,7 +4,7 @@
     "name": "Deep Space",
     "desc": "A gentle introduction. Wide tunnels, forgiving gaps.",
     "difficulty": "Easy",
-    "file": "levels/level-1.css",
+    "file": "Levels/Not_Too_Hard.css",
     "color": "#22c55e"
   }
 ]
