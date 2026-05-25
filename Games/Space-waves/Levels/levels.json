@@ -6,13 +6,5 @@
     "difficulty": "Easy",
     "file": "levels/level-1.css",
     "color": "#22c55e"
-  },
-  {
-    "id": "level-2",
-    "name": "Asteroid Belt",
-    "desc": "Tighter corridors and fast direction changes. Stay sharp.",
-    "difficulty": "Medium",
-    "file": "levels/level-2.css",
-    "color": "#f59e0b"
   }
 ]
