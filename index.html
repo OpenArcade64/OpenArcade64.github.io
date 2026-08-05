@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Canvas</title>
+    <title>Multiplayer Canvas - Permanent</title>
     <style>
         body {
             margin: 0;
@@ -21,12 +21,16 @@
             background: rgba(0, 0, 0, 0.7);
             padding: 10px 20px;
             border-radius: 8px;
-            pointer-events: none; /* Lets you draw under the text */
+            pointer-events: none;
+            z-index: 10;
         }
         canvas {
             background-color: #ffffff;
             cursor: crosshair;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            position: absolute;
+            top: 0;
+            left: 0;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -34,7 +38,7 @@
 <body>
 
     <div id="ui-layer">
-        <h3 style="margin: 0;" id="statusText">Connecting to multiplayer...</h3>
+        <h3 style="margin: 0;" id="statusText">Loading saved canvas...</h3>
     </div>
 
     <canvas id="drawingCanvas"></canvas>
@@ -50,40 +54,50 @@
         const ctx = canvas.getContext('2d');
         const statusText = document.getElementById('statusText');
 
-        // Make canvas fill the screen
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-
-        // Drawing Settings
         ctx.lineWidth = 5;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#000000'; // Black ink
+        ctx.strokeStyle = '#000000'; 
 
         let isDrawing = false;
         let lastX = 0;
         let lastY = 0;
 
-        // --- 3. MULTIPLAYER BROADCAST SETUP ---
-        // We create a "room" that everyone connects to
-        const room = db.channel('global_whiteboard');
+        // --- 3. LOAD PERMANENT DATA ON STARTUP ---
+        async function loadSavedCanvas() {
+            // Get the absolute newest row from the whiteboard table
+            const { data, error } = await db
+                .from('whiteboard')
+                .select('image_data')
+                .order('id', { ascending: false })
+                .limit(1);
 
-        // Listen for other people's drawings
-        room.on('broadcast', { event: 'draw' }, (payload) => {
-            const data = payload.payload;
-            // Draw their line on our screen (set 'emit' to false so we don't create an infinite loop)
-            drawLine(data.x0, data.y0, data.x1, data.y1, false);
-        });
-
-        // Actually connect to the room
-        room.subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
+            if (data && data.length > 0 && data[0].image_data) {
+                // Convert the saved text back into an image
+                const img = new Image();
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                    statusText.innerText = "Multiplayer Live! Start drawing.";
+                    statusText.style.color = "#44ff44";
+                };
+                img.src = data[0].image_data;
+            } else {
                 statusText.innerText = "Multiplayer Live! Start drawing.";
                 statusText.style.color = "#44ff44";
             }
-        });
+        }
+        loadSavedCanvas();
 
-        // --- 4. DRAWING LOGIC ---
-        // Function that physically draws the line on the screen
+        // --- 4. MULTIPLAYER BROADCAST ---
+        const room = db.channel('global_whiteboard');
+        room.on('broadcast', { event: 'draw' }, (payload) => {
+            const data = payload.payload;
+            drawLine(data.x0, data.y0, data.x1, data.y1, false);
+        });
+        room.subscribe();
+
+        // --- 5. DRAWING & SAVING LOGIC ---
         function drawLine(x0, y0, x1, y1, emit) {
             ctx.beginPath();
             ctx.moveTo(x0, y0);
@@ -91,7 +105,6 @@
             ctx.stroke();
             ctx.closePath();
 
-            // If we drew this locally, broadcast it to everyone else
             if (emit) {
                 room.send({
                     type: 'broadcast',
@@ -101,7 +114,6 @@
             }
         }
 
-        // Mouse Events
         canvas.addEventListener('mousedown', (e) => {
             isDrawing = true;
             lastX = e.clientX;
@@ -110,24 +122,27 @@
 
         canvas.addEventListener('mousemove', (e) => {
             if (!isDrawing) return;
-            // Draw the line from where the mouse was to where it is now
             drawLine(lastX, lastY, e.clientX, e.clientY, true);
             lastX = e.clientX;
             lastY = e.clientY;
         });
 
-        window.addEventListener('mouseup', () => {
-            isDrawing = false;
+        // When you lift the mouse, save the canvas state to the database
+        window.addEventListener('mouseup', async () => {
+            if (isDrawing) {
+                isDrawing = false;
+                
+                // Convert the entire canvas into a Base64 text string
+                const canvasData = canvas.toDataURL(); 
+                
+                // Upload it to Supabase secretly in the background
+                await db.from('whiteboard').insert([{ image_data: canvasData }]);
+            }
         });
 
-        // Handle window resizing
         window.addEventListener('resize', () => {
-            // Note: Resizing clears the canvas natively in HTML5
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.lineWidth = 5;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#000000';
+            // Because resizing wipes the canvas, we just reload the page to fetch the saved state
+            window.location.reload(); 
         });
     </script>
 </body>
