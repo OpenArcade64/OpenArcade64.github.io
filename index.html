@@ -3,70 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Canvas - Permanent</title>
+    <title>Multiplayer Canvas - Pro Edition</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #222;
-            color: white;
+            background-color: #f0f0f0;
             font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
-        #ui-layer {
+        
+        /* Toolbar UI */
+        #toolbar {
             position: absolute;
             top: 10px;
-            background: rgba(0, 0, 0, 0.7);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
             padding: 10px 20px;
             border-radius: 8px;
-            pointer-events: none;
-            z-index: 10;
+            z-index: 100;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
+        
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button, select, input[type="color"] {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            border: none;
+        }
+
         canvas {
             background-color: #ffffff;
             cursor: crosshair;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
             position: absolute;
             top: 0;
             left: 0;
+        }
+
+        /* Remote Player Cursors */
+        .remote-cursor {
+            position: absolute;
+            pointer-events: none;
+            z-index: 50;
+            transition: top 0.05s linear, left 0.05s linear;
+        }
+        
+        .cursor-pointer {
+            width: 15px;
+            height: 15px;
+            background-color: red;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%);
+        }
+        
+        .cursor-name {
+            position: absolute;
+            top: -25px;
+            left: -10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <h3 style="margin: 0;" id="statusText">Loading saved canvas...</h3>
+    <div id="toolbar">
+        <div class="tool-group">
+            <label>Color:</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+        <div class="tool-group">
+            <label>Tool:</label>
+            <select id="toolPicker">
+                <option value="pencil">Pencil</option>
+                <option value="square">Square</option>
+                <option value="circle">Circle</option>
+                <option value="text">Text</option>
+            </select>
+        </div>
+        <div class="tool-group" id="statusText" style="color: #ffaa00; margin-left: 10px;">
+            Connecting...
+        </div>
     </div>
 
     <canvas id="drawingCanvas"></canvas>
 
+    <div id="cursorsContainer"></div>
+
     <script>
+        // --- 0. USER SETUP ---
+        const myName = prompt("Welcome! Enter a name to show above your cursor:") || "Anonymous";
+        const myId = Math.random().toString(36).substr(2, 9);
+
         // --- 1. SUPABASE CONNECTION ---
         const supabaseUrl = 'https://acfrhcblcogfywiivfai.supabase.co';
         const supabaseKey = 'sb_publishable_bICLUE7sf8b2aifcCRvVBA_cvxdclPp'; 
         const db = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-        // --- 2. CANVAS SETUP ---
+        // --- 2. CANVAS & TOOL SETUP ---
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
         const statusText = document.getElementById('statusText');
+        const colorPicker = document.getElementById('colorPicker');
+        const toolPicker = document.getElementById('toolPicker');
+        const cursorsContainer = document.getElementById('cursorsContainer');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        ctx.lineWidth = 5;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#000000'; 
 
         let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
+        let startX = 0, startY = 0;
+        let lastX = 0, lastY = 0;
 
-        // --- 3. LOAD PERMANENT DATA ON STARTUP ---
+        // --- 3. ADMIN CONSOLE COMMAND ---
+        window.clear = {
+            canvas: async function(code) {
+                if (code === "code=Admin2341") {
+                    console.log("Admin command accepted. Clearing canvas...");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    const blankCanvas = canvas.toDataURL();
+                    await db.from('whiteboard').insert([{ image_data: blankCanvas }]);
+                    room.send({ type: 'broadcast', event: 'clear_board' });
+                    console.log("Canvas cleared for everyone.");
+                } else {
+                    console.error("Access Denied: Invalid admin code.");
+                }
+            }
+        };
+
+        // --- 4. LOAD PERMANENT DATA ON STARTUP ---
         async function loadSavedCanvas() {
-            // Get the absolute newest row from the whiteboard table
             const { data, error } = await db
                 .from('whiteboard')
                 .select('image_data')
@@ -74,76 +159,162 @@
                 .limit(1);
 
             if (data && data.length > 0 && data[0].image_data) {
-                // Convert the saved text back into an image
                 const img = new Image();
                 img.onload = () => {
                     ctx.drawImage(img, 0, 0);
-                    statusText.innerText = "Multiplayer Live! Start drawing.";
+                    statusText.innerText = `Connected as ${myName}`;
                     statusText.style.color = "#44ff44";
                 };
                 img.src = data[0].image_data;
             } else {
-                statusText.innerText = "Multiplayer Live! Start drawing.";
+                statusText.innerText = `Connected as ${myName}`;
                 statusText.style.color = "#44ff44";
             }
         }
         loadSavedCanvas();
 
-        // --- 4. MULTIPLAYER BROADCAST ---
+        // --- 5. MULTIPLAYER SYNCING ---
         const room = db.channel('global_whiteboard');
+
         room.on('broadcast', { event: 'draw' }, (payload) => {
-            const data = payload.payload;
-            drawLine(data.x0, data.y0, data.x1, data.y1, false);
+            const d = payload.payload;
+            ctx.strokeStyle = d.color;
+            ctx.fillStyle = d.color;
+            ctx.lineWidth = 5;
+
+            if (d.tool === 'pencil') {
+                ctx.beginPath(); ctx.moveTo(d.x0, d.y0); ctx.lineTo(d.x1, d.y1); ctx.stroke();
+            } else if (d.tool === 'square') {
+                ctx.fillRect(d.x0, d.y0, d.w, d.h);
+            } else if (d.tool === 'circle') {
+                ctx.beginPath(); ctx.arc(d.x0, d.y0, d.r, 0, 2 * Math.PI); ctx.fill();
+            } else if (d.tool === 'text') {
+                ctx.font = "20px Arial"; ctx.fillText(d.text, d.x0, d.y0);
+            }
         });
+
+        // Syncing cursors
+        room.on('broadcast', { event: 'cursor' }, (payload) => {
+            const d = payload.payload;
+            let cursorEl = document.getElementById(`cursor-${d.id}`);
+            
+            if (!cursorEl) {
+                cursorEl = document.createElement('div');
+                cursorEl.id = `cursor-${d.id}`;
+                cursorEl.className = 'remote-cursor';
+                cursorEl.innerHTML = `
+                    <div class="cursor-name">${d.name}</div>
+                    <div class="cursor-pointer" style="background-color: ${d.color}"></div>
+                `;
+                cursorsContainer.appendChild(cursorEl);
+            }
+            
+            cursorEl.style.left = `${d.x}px`;
+            cursorEl.style.top = `${d.y}px`;
+        });
+
+        // Listen for admin clear
+        room.on('broadcast', { event: 'clear_board' }, () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
         room.subscribe();
 
-        // --- 5. DRAWING & SAVING LOGIC ---
-        function drawLine(x0, y0, x1, y1, emit) {
-            ctx.beginPath();
-            ctx.moveTo(x0, y0);
-            ctx.lineTo(x1, y1);
-            ctx.stroke();
-            ctx.closePath();
+        // Broadcast local cursor position
+        window.addEventListener('mousemove', (e) => {
+            room.send({
+                type: 'broadcast',
+                event: 'cursor',
+                payload: { id: myId, name: myName, x: e.clientX, y: e.clientY, color: colorPicker.value }
+            });
+        });
 
-            if (emit) {
-                room.send({
-                    type: 'broadcast',
-                    event: 'draw',
-                    payload: { x0, y0, x1, y1 }
-                });
-            }
-        }
-
+        // --- 6. DRAWING LOGIC ---
         canvas.addEventListener('mousedown', (e) => {
             isDrawing = true;
+            startX = e.clientX;
+            startY = e.clientY;
             lastX = e.clientX;
             lastY = e.clientY;
+
+            if (toolPicker.value === 'text') {
+                isDrawing = false;
+                const userInput = prompt("Enter text to place here:");
+                if (userInput) {
+                    ctx.fillStyle = colorPicker.value;
+                    ctx.font = "20px Arial";
+                    ctx.fillText(userInput, startX, startY);
+                    
+                    room.send({
+                        type: 'broadcast', event: 'draw',
+                        payload: { tool: 'text', x0: startX, y0: startY, text: userInput, color: colorPicker.value }
+                    });
+                    saveToCloud();
+                }
+            }
         });
 
         canvas.addEventListener('mousemove', (e) => {
             if (!isDrawing) return;
-            drawLine(lastX, lastY, e.clientX, e.clientY, true);
-            lastX = e.clientX;
-            lastY = e.clientY;
-        });
+            const tool = toolPicker.value;
 
-        // When you lift the mouse, save the canvas state to the database
-        window.addEventListener('mouseup', async () => {
-            if (isDrawing) {
-                isDrawing = false;
+            if (tool === 'pencil') {
+                ctx.strokeStyle = colorPicker.value;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(e.clientX, e.clientY);
+                ctx.stroke();
+
+                room.send({
+                    type: 'broadcast', event: 'draw',
+                    payload: { tool: 'pencil', x0: lastX, y0: lastY, x1: e.clientX, y1: e.clientY, color: colorPicker.value }
+                });
                 
-                // Convert the entire canvas into a Base64 text string
-                const canvasData = canvas.toDataURL(); 
-                
-                // Upload it to Supabase secretly in the background
-                await db.from('whiteboard').insert([{ image_data: canvasData }]);
+                lastX = e.clientX;
+                lastY = e.clientY;
             }
         });
 
-        window.addEventListener('resize', () => {
-            // Because resizing wipes the canvas, we just reload the page to fetch the saved state
-            window.location.reload(); 
+        window.addEventListener('mouseup', (e) => {
+            if (isDrawing && toolPicker.value !== 'pencil' && toolPicker.value !== 'text') {
+                const endX = e.clientX;
+                const endY = e.clientY;
+                ctx.fillStyle = colorPicker.value;
+
+                if (toolPicker.value === 'square') {
+                    const width = endX - startX;
+                    const height = endY - startY;
+                    ctx.fillRect(startX, startY, width, height);
+                    room.send({
+                        type: 'broadcast', event: 'draw',
+                        payload: { tool: 'square', x0: startX, y0: startY, w: width, h: height, color: colorPicker.value }
+                    });
+                } 
+                else if (toolPicker.value === 'circle') {
+                    const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                    ctx.beginPath();
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    ctx.fill();
+                    room.send({
+                        type: 'broadcast', event: 'draw',
+                        payload: { tool: 'circle', x0: startX, y0: startY, r: radius, color: colorPicker.value }
+                    });
+                }
+            }
+
+            if (isDrawing) {
+                isDrawing = false;
+                saveToCloud();
+            }
         });
+
+        async function saveToCloud() {
+            const canvasData = canvas.toDataURL(); 
+            await db.from('whiteboard').insert([{ image_data: canvasData }]);
+        }
+
+        window.addEventListener('resize', () => { window.location.reload(); });
     </script>
 </body>
 </html>
