@@ -1,101 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geometry Dash HTML5</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #222;
-            color: white;
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+<script>
+    // --- 1. SETUP CLOUD DATABASE ---
+    // REPLACE THESE WITH YOUR ACTUAL SUPABASE DETAILS
+    const supabaseUrl = 'YOUR_SUPABASE_PROJECT_URL';
+    const supabaseKey = 'YOUR_PUBLISHABLE_KEY'; 
+    
+    // FIX: Renamed the connection to 'db' so it doesn't clash with the Supabase library
+    const db = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // --- 2. TEST CONNECTION FUNCTION ---
+    document.getElementById('testDbBtn').addEventListener('click', async () => {
+        const statusText = document.getElementById('statusText');
+        statusText.innerText = "Sending test level to cloud...";
+
+        const testLevelData = {
+            level_name: "My First Connection Test",
+            author: "Dev",
+            level_data: JSON.stringify({ objects: [], settings: { bg: "blue" } })
+        };
+
+        // FIX: Use 'db' here instead of 'supabase'
+        const { data, error } = await db
+            .from('levels')
+            .insert([testLevelData]);
+
+        if (error) {
+            console.error("Database Error:", error);
+            statusText.innerText = "Error! Check the console (F12).";
+            statusText.style.color = "#ff4444";
+        } else {
+            console.log("Success! Data sent to Supabase.");
+            statusText.innerText = "Success! Check your Supabase Table Editor!";
+            statusText.style.color = "#44ff44";
         }
-        canvas {
-            background-color: #1a1a1a;
-            border: 2px solid #555;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-        #ui-layer {
-            margin-top: 20px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
+    });
 
-    <canvas id="gameCanvas" width="800" height="450"></canvas>
+    // --- 3. BASIC CANVAS SETUP ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-    <div id="ui-layer">
-        <button id="testDbBtn">Test Cloud Connection</button>
-        <p id="statusText">Waiting to test...</p>
-    </div>
-
-    <script>
-        // --- 1. SETUP CLOUD DATABASE ---
-        // REPLACE THESE WITH YOUR ACTUAL SUPABASE DETAILS
-        const supabaseUrl = 'https://acfrhcblcogfywiivfai.supabase.co';
-        const supabaseKey = 'sb_publishable_bICLUE7sf8b2aifcCRvVBA_cvxdclPp'; // Use the sb_publishable_... key here
-        
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-        // --- 2. TEST CONNECTION FUNCTION ---
-        document.getElementById('testDbBtn').addEventListener('click', async () => {
-            const statusText = document.getElementById('statusText');
-            statusText.innerText = "Sending test level to cloud...";
-
-            // Create a fake level to test the database
-            const testLevelData = {
-                level_name: "My First Connection Test",
-                author: "Dev",
-                level_data: JSON.stringify({ objects: [], settings: { bg: "blue" } })
-            };
-
-            // Send it to the 'levels' table we created
-            const { data, error } = await supabase
-                .from('levels')
-                .insert([testLevelData]);
-
-            if (error) {
-                console.error("Database Error:", error);
-                statusText.innerText = "Error! Check the console (F12).";
-                statusText.style.color = "#ff4444";
-            } else {
-                console.log("Success! Data sent to Supabase.");
-                statusText.innerText = "Success! Check your Supabase Table Editor!";
-                statusText.style.color = "#44ff44";
-            }
-        });
-
-        // --- 3. BASIC CANVAS SETUP ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Just drawing a simple square to prove the canvas works
-        ctx.fillStyle = '#00ff00';
-        ctx.fillRect(100, 350, 30, 30); // x, y, width, height
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '20px Arial';
-        ctx.fillText('Game Engine Ready', 300, 225);
-    </script>
-</body>
-</html>
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(100, 350, 30, 30); 
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '20px Arial';
+    ctx.fillText('Game Engine Ready', 300, 225);
+</script>
